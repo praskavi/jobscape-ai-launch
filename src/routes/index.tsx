@@ -1,26 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import LandingPage from "@/components/LandingPage";
 
 export const Route = createFileRoute("/")({
-  component: Index,
+  component: LandingPage,
+  head: () => ({
+    meta: [
+      { title: "Jobscape AI — AI-powered job search & resume matching" },
+      { name: "description", content: "Upload your resume, search live jobs, and instantly see which roles are worth applying for with AI-powered match scores." },
+      { property: "og:title", content: "Jobscape AI — Apply smarter, not harder" },
+      { property: "og:description", content: "AI resume matching and ATS scoring for live job listings." },
+    ],
+  }),
 });
-
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
-
-function Index() {
-  return <PlaceholderIndex />;
-}
