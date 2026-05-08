@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link } from "@tanstack/react-router";
+import Link from "next/link";
 import { Briefcase } from "lucide-react";
 import { SocialLoginButton } from "./SocialLoginButton";
 import { Divider } from "./Divider";
@@ -146,14 +146,14 @@ export function LoginPage() {
 
         <div className="mt-6 flex flex-col items-center gap-2 text-sm">
           <Link
-            to="/"
+            href="/"
             className="text-muted-foreground transition-colors hover:text-foreground"
           >
             Forgot password?
           </Link>
           <p className="text-muted-foreground">
             Don't have an account?{" "}
-            <Link to="/" className="font-semibold text-foreground hover:underline">
+            <Link href="/register" className="font-semibold text-foreground hover:underline">
               Sign up
             </Link>
           </p>
