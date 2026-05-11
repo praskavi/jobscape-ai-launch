@@ -1,0 +1,25 @@
+# Ignore logs and temporary files
+*.log
+*.tmp
+temp/
+
+# Ignore dependency directories (often very large)
+node_modules/
+dist/
+build/
+bin/
+obj/
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore environment variables and secrets (CRITICAL for security)
+.env
+.env.local
+secrets.json
+
+# Ignore IDE-specific folders
+.vscode/
+.idea/
+*.swp

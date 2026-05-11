@@ -25,27 +25,32 @@ const TwitterIcon = () => (
   </svg>
 );
 
-export function LoginPage() {
+export function SignupPage() {
+  const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleGoogleLogin = () => {
+  const handleGoogleSignup = () => {
     // TODO: connect Google auth
-    console.log("Google login");
+    console.log("Google signup");
   };
 
-  const handleTwitterLogin = () => {
+  const handleTwitterSignup = () => {
     // TODO: connect Twitter auth
-    console.log("Twitter login");
+    console.log("Twitter signup");
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
 
-    if (!email.trim() || !password) {
-      setError("Please enter your email and password.");
+    // Basic Validation
+    if (!name.trim() || !email.trim() || !password) {
+      setError("Please fill in all fields.");
       return;
     }
     if (!/^\S+@\S+\.\S+$/.test(email)) {
@@ -57,13 +62,41 @@ export function LoginPage() {
       return;
     }
 
-    console.log("Login submit", { email, password });
+    setIsLoading(true);
+
+    try {
+      // Send data to the backend
+      const response = await fetch("http://localhost:3000/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Something went wrong during signup");
+      }
+
+      // Success! Clear the form and show a message
+      setSuccessMsg("Account created successfully! You can now log in.");
+      setName("");
+      setEmail("");
+      setPassword("");
+
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <section
-        aria-labelledby="login-heading"
+        aria-labelledby="signup-heading"
         className="w-full max-w-[400px] rounded-xl border border-border bg-surface p-8 shadow-soft"
       >
         <div className="flex flex-col items-center text-center">
@@ -73,32 +106,49 @@ export function LoginPage() {
           >
             <Briefcase className="h-7 w-7" />
           </div>
-          <h1 id="login-heading" className="mt-5 text-2xl font-bold tracking-tight text-foreground">
-            Login to {APP_NAME}
+          <h1 id="signup-heading" className="mt-5 text-2xl font-bold tracking-tight text-foreground">
+            Join {APP_NAME}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Welcome back. Pick up where you left off.
+            Create an account to start applying smarter.
           </p>
         </div>
 
         <div className="mt-6 flex flex-col gap-3">
           <SocialLoginButton
             icon={<GoogleIcon />}
-            label="Continue with Google"
-            onClick={handleGoogleLogin}
+            label="Sign up with Google"
+            onClick={handleGoogleSignup}
           />
           <SocialLoginButton
             icon={<TwitterIcon />}
-            label="Continue with Twitter"
-            onClick={handleTwitterLogin}
+            label="Sign up with Twitter"
+            onClick={handleTwitterSignup}
           />
         </div>
 
         <div className="my-5">
-          <Divider label="or login with email" />
+          <Divider label="or sign up with email" />
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3" noValidate>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="name" className="sr-only">
+              Full Name
+            </label>
+            <input
+              id="name"
+              type="text"
+              autoComplete="name"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={isLoading}
+              className="h-10 w-full rounded-lg border border-input bg-surface px-3 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              required
+            />
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <label htmlFor="email" className="sr-only">
               Email address
@@ -110,7 +160,8 @@ export function LoginPage() {
               placeholder="Email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-10 w-full rounded-lg border border-input bg-surface px-3 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              disabled={isLoading}
+              className="h-10 w-full rounded-lg border border-input bg-surface px-3 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               required
             />
           </div>
@@ -121,10 +172,11 @@ export function LoginPage() {
             </label>
             <PasswordInput
               id="password"
-              autoComplete="current-password"
-              placeholder="Password"
+              autoComplete="new-password"
+              placeholder="Password (min. 8 characters)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
               minLength={8}
               required
             />
@@ -136,25 +188,26 @@ export function LoginPage() {
             </p>
           )}
 
+          {successMsg && (
+            <p role="alert" className="text-xs font-medium text-green-600 dark:text-green-400">
+              {successMsg}
+            </p>
+          )}
+
           <button
             type="submit"
-            className="mt-1 h-10 w-full rounded-lg bg-foreground text-sm font-semibold text-background transition-colors hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            disabled={isLoading}
+            className="mt-1 h-10 w-full rounded-lg bg-foreground text-sm font-semibold text-background transition-colors hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            Log in
+            {isLoading ? "Creating account..." : "Create account"}
           </button>
         </form>
 
         <div className="mt-6 flex flex-col items-center gap-2 text-sm">
-          <Link
-            href="/"
-            className="text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Forgot password?
-          </Link>
           <p className="text-muted-foreground">
-            Don't have an account?{" "}
-            <Link href="/register" className="font-semibold text-foreground hover:underline">
-              Sign up
+            Already have an account?{" "}
+            <Link href="/login" className="font-semibold text-foreground hover:underline">
+              Log in
             </Link>
           </p>
         </div>
