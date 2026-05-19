@@ -4,9 +4,11 @@ import { Menu, LogOut } from "lucide-react";
 export function DashboardHeader({
   user,
   onMenu,
+  onLogout, // ADDED THIS
 }: {
   user: { full_name: string; email: string };
   onMenu: () => void;
+  onLogout: () => void; // ADDED THIS
 }) {
   const getInitials = (name: string) =>
     name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -37,7 +39,7 @@ export function DashboardHeader({
           {getInitials(user.full_name)}
         </div>
         <button
-          type="button"
+          type="button" onClick={onLogout}
           className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-muted"
         >
           <LogOut className="h-3.5 w-3.5" />

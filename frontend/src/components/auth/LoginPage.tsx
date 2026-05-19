@@ -4,6 +4,7 @@ import { Briefcase } from "lucide-react";
 import { SocialLoginButton } from "./SocialLoginButton";
 import { Divider } from "./Divider";
 import { PasswordInput } from "./PasswordInput";
+import { supabase } from "@/controllers/suabaseClient";
 
 const APP_NAME = "JobMatch AI";
 
@@ -59,28 +60,26 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
-      // 1. Send data to your Node.js backend
-      const response = await fetch("http://localhost:3000/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
+      // 1. Send data to your supabase
+      const {data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
-
-      const data = await response.json();
+      
+      if (signInError) {
+        throw signInError;
+      }
 
       // 2. Handle errors (e.g., wrong password, user not found)
-      if (!response.ok) {
-        throw new Error(data.error || "Invalid login credentials.");
+      if (signInError) {
+        throw new Error(signInError.message);
       }
 
       // 3. Success! 
       setSuccessMsg("Logged in successfully!");
-      console.log("Session data:", data.session);
       
-      // TODO: Save the session token (e.g., in localStorage or cookies)
-      // TODO: Redirect user to the dashboard using next/navigation router.push('/dashboard')
+      // TODO: Redirect user to the dashboard 
+      // e.g., router.push('/dashboard') or window.location.href = '/dashboard';
 
     } catch (err: any) {
       setError(err.message);

@@ -4,6 +4,8 @@ import { Briefcase } from "lucide-react";
 import { SocialLoginButton } from "./SocialLoginButton";
 import { Divider } from "./Divider";
 import { PasswordInput } from "./PasswordInput";
+import { supabase } from "@/controllers/suabaseClient";
+import { useRouter } from "next/navigation";
 
 const APP_NAME = "JobMatch AI";
 
@@ -32,6 +34,8 @@ export function SignupPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  
+  const router = useRouter();
 
   const handleGoogleSignup = () => {
     // TODO: connect Google auth
@@ -65,27 +69,33 @@ export function SignupPage() {
     setIsLoading(true);
 
     try {
-      // Send data to the backend
-      const response = await fetch("http://localhost:3000/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, email, password }),
+      // 1. Create account with Supabase
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            full_name: name, // This saves the user's name into Supabase auth
+          }
+        }
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Something went wrong during signup");
+      // 2. Handle errors
+      if (signUpError) {
+        throw new Error(signUpError.message);
       }
 
-      // Success! Clear the form and show a message
-      setSuccessMsg("Account created successfully! You can now log in.");
+      // Success! Show popup/message and redirect
+      setSuccessMsg("Signup successful! Please check your email box to confirm it's you.");
       setName("");
       setEmail("");
       setPassword("");
 
+      // Redirect to dashboard after 3 seconds so they can read the message
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 3000);
+      
     } catch (err: any) {
       setError(err.message);
     } finally {
