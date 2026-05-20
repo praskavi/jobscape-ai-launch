@@ -4,7 +4,9 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "npx tsr watch & next dev",
+    "generate": "npx tsr generate",
+    "tsr:watch": "npx tsr watch",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
