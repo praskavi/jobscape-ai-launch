@@ -70,11 +70,6 @@ export function LoginPage() {
         throw signInError;
       }
 
-      // 2. Handle errors (e.g., wrong password, user not found)
-      if (signInError) {
-        throw new Error(signInError.message);
-      }
-
       // 3. Success! 
       setSuccessMsg("Logged in successfully!");
       
