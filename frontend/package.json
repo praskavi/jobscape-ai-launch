@@ -4,12 +4,12 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "generate": "npx @tanstack/router-cli generate",
-    "tsr:watch": "npx @tanstack/router-cli watch",
-    "build": "npm run generate && vite build",
-    "preview": "vite preview",
-    "lint": "eslint .",
+    "dev": "npx tsr watch & next dev",
+    "generate": "npx tsr generate",
+    "tsr:watch": "npx tsr watch",
+    "build": "npx tsr generate && next build",
+    "start": "next start",
+    "lint": "next lint",
     "format": "prettier --write ."
   },
   "dependencies": {
