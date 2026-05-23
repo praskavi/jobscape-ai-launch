@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "generate": "tsr generate",
-    "tsr:watch": "tsr watch",
+    "generate": "npx @tanstack/router-cli generate",
+    "tsr:watch": "npx @tanstack/router-cli watch",
     "build": "npm run generate && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
