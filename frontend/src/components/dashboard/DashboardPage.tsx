@@ -7,121 +7,186 @@ import { StatCard } from "../ui/StatCard";
 import { DocumentSection } from "./DocumentSection";
 import { RecentSearches } from "./RecentSearches";
 import { ConfirmDeleteModal } from "../ui/ConfirmDeleteModal";
-import { MOCK_USER, MOCK_SEARCHES } from "../../lib/mockData";
 import type { UserDocument } from "../../controllers/useDocuments";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/controllers/suabaseClient";
 
+// Removed the MOCK_USER and MOCK_SEARCHES imports!
+
 export function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = React.useState<{full_name: string; email: string} | null>(null);
+  // Added 'id' to the user state so we can query the database and storage safely
+  const [user, setUser] = React.useState<{id: string; full_name: string; email: string} | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  
   const [resume, setResume] = React.useState<UserDocument | null>(null);
   const [coverLetter, setCoverLetter] = React.useState<UserDocument | null>(null);
-  const [searches] = React.useState(MOCK_SEARCHES);
+  const [searches, setSearches] = React.useState<any[]>([]); // Dynamic searches state
+  
   const [pendingDelete, setPendingDelete] = React.useState<"resume" | "cover_letter" | null>(null);
   const [mobileNav, setMobileNav] = React.useState(false);
 
+  React.useEffect(() => {
+    const fetchDashboardData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push("/login");
+        return;
+      }
+
+      const userId = session.user.id;
+
+      // 1. Fetch User Profile (Matching our previous fixes)
+      let finalName = 'User';
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .single();
+
+      if (profileData && profileData.full_name) {
+        finalName = profileData.full_name;
+      } else {
+        finalName = session.user.user_metadata?.full_name 
+                 || session.user.user_metadata?.name 
+                 || session.user.email?.split('@')[0] 
+                 || 'User';
+      }
+
+      setUser({
+        id: userId,
+        email: session.user.email || "",
+        full_name: finalName,
+      });
+
+      // 2. Fetch User Documents from Database
+      // You must create a 'user_documents' table to persist this data!
+      const { data: docsData } = await supabase
+        .from('user_documents')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (docsData) {
+        const res = docsData.find(d => d.document_type === 'resume');
+        const cl = docsData.find(d => d.document_type === 'cover_letter');
+        
+        // If your bucket is private, you would generate signed URLs here. 
+        // Assuming public bucket or stored URLs for now based on your previous setup:
+        if (res) setResume(res as UserDocument);
+        if (cl) setCoverLetter(cl as UserDocument);
+      }
+
+      // 3. Fetch Real Search History
+      // Ensure you have a 'search_history' table
+      const { data: searchData } = await supabase
+        .from('search_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5); // Only show the 5 most recent
+
+      if (searchData) {
+        setSearches(searchData);
+      }
+
+      setIsLoading(false);
+    };
+
+    fetchDashboardData();
+  }, [router]);
+
   const handleUpload = async (type: "resume" | "cover_letter", file: File) => {
-    if (!user) return; // Make sure we have the logged-in user
+    if (!user) return; 
 
     try {
-      // 1. Create a unique, organized file path in the bucket (e.g., userEmail/resume_12345.pdf)
+      // FIX 1: Use user.id instead of user.email for the storage path
       const fileExt = file.name.split('.').pop();
       const fileName = `${type}_${Date.now()}.${fileExt}`;
-      const filePath = `${user.email}/${fileName}`;
+      const filePath = `${user.id}/${fileName}`; 
 
-      // 2. Upload the physical file to Supabase Storage
+      // Upload to Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("documents") // Matches the bucket name you just created
+        .from("documents") 
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false // Don't overwrite existing files with the same name
+          upsert: true // Changed to true so users can overwrite their old resumes
         });
 
       if (uploadError) throw uploadError;
 
-      // 3. Generate a secure, temporary link so the user can click "View File" (Valid for 1 hour)
+      // Generate URL
       const { data: urlData, error: urlError } = await supabase.storage
         .from("documents")
-        .createSignedUrl(filePath, 3600);
+        .createSignedUrl(filePath, 31536000); // Valid for 1 year instead of 1 hour
 
       if (urlError) throw urlError;
 
-      // 4. Update the UI with the real cloud data
-      const doc: UserDocument = {
-        id: uploadData.path, // We store the bucket path as the ID so we can easily delete it later
+      const docPayload = {
+        id: uploadData.path, 
+        user_id: user.id, 
         document_type: type,
         file_name: file.name,
         file_url: urlData.signedUrl,
         mime_type: file.type,
-        uploaded_at: new Date().toISOString(),
+        uploaded_at: new Date().toISOString(), // <-- ADDED THIS LINE
       };
 
-      if (type === "resume") setResume(doc);
-      else setCoverLetter(doc);
+      // FIX 2: Save metadata to the database so it survives page refreshes
+      const { error: dbError } = await supabase
+        .from('user_documents')
+        .upsert(docPayload); // Upsert allows updating if they already have a resume
+
+      if (dbError) throw dbError;
+
+      // Update UI
+      if (type === "resume") setResume(docPayload as UserDocument);
+      else setCoverLetter(docPayload as UserDocument);
 
     } catch (error: any) {
-      console.error("Error uploading to Supabase:", error.message);
+      console.error("Upload Error:", error.message);
       alert("Failed to upload document: " + error.message);
     }
   };
 
   const confirmDelete = async () => {
-    // Figure out which document we are trying to delete
     const docToDelete = pendingDelete === "resume" ? resume : coverLetter;
-    
-    if (!docToDelete) {
-      setPendingDelete(null);
-      return;
-    }
+    if (!docToDelete || !user) return setPendingDelete(null);
 
     try {
-      // 1. Delete the file from the Supabase Storage bucket
-      // We pass docToDelete.id because we saved the file's path as the ID during upload
-      const { error } = await supabase.storage
+      // 1. Delete from Storage
+      const { error: storageError } = await supabase.storage
         .from("documents")
         .remove([docToDelete.id]);
 
-      if (error) throw error;
+      if (storageError) throw storageError;
 
-      // 2. If successful, remove it from the UI state
+      // 2. Delete from Database
+      const { error: dbError } = await supabase
+        .from('user_documents')
+        .delete()
+        .eq('id', docToDelete.id);
+
+      if (dbError) throw dbError;
+
+      // 3. Update UI
       if (pendingDelete === "resume") setResume(null);
       if (pendingDelete === "cover_letter") setCoverLetter(null);
       
       setPendingDelete(null);
 
     } catch (error: any) {
-      console.error("Error deleting from Supabase:", error.message);
+      console.error("Delete Error:", error.message);
       alert("Failed to delete document.");
       setPendingDelete(null);
     }
   };
-
-  React.useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.push("/login"); // Kick to login if not authenticated
-      } else {
-        setUser({
-          email: session.user.email || "",
-          full_name: session.user.user_metadata?.full_name || "User",
-        });
-        setIsLoading(false);
-      }
-    };
-
-    checkSession();
-  }, [router]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
 
-  // Prevent UI flashing before session is verified
   if (isLoading) {
     return <div className="flex min-h-screen items-center justify-center">Loading Dashboard...</div>;
   }
@@ -229,6 +294,7 @@ export function DashboardPage() {
               <DocumentSection
                 title="Cover Letter"
                 type="cover_letter"
+                // @ts-ignore
                 doc={coverLetter}
                 onUpload={(f) => handleUpload("cover_letter", f)}
                 onRequestDelete={() => setPendingDelete("cover_letter")}

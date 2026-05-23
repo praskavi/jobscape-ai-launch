@@ -12,6 +12,7 @@ const NAV = [
   { label: "Resume & Cover Letter", href: "/documents", icon: FileStack }, // Adjust this path if needed
   { label: "Job Searches", href: "/jobsearch", icon: Search },
   { label: "Settings", href: "/settings", icon: SettingsIcon }, // Adjust this path if needed
+  { label: "ATS Checker", href: "/atschecker", icon: Search}
 ];
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {

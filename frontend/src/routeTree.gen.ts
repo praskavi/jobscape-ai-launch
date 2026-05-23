@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as JobsearchRouteImport } from './routes/jobsearch'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as AtscheckerRouteImport } from './routes/atschecker'
 import { Route as IndexRouteImport } from './routes/index'
 
 const LoginRoute = LoginRouteImport.update({
@@ -29,6 +30,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AtscheckerRoute = AtscheckerRouteImport.update({
+  id: '/atschecker',
+  path: '/atschecker',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,12 +43,14 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/atschecker': typeof AtscheckerRoute
   '/dashboard': typeof DashboardRoute
   '/jobsearch': typeof JobsearchRoute
   '/login': typeof LoginRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/atschecker': typeof AtscheckerRoute
   '/dashboard': typeof DashboardRoute
   '/jobsearch': typeof JobsearchRoute
   '/login': typeof LoginRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/atschecker': typeof AtscheckerRoute
   '/dashboard': typeof DashboardRoute
   '/jobsearch': typeof JobsearchRoute
   '/login': typeof LoginRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/jobsearch' | '/login'
+  fullPaths: '/' | '/atschecker' | '/dashboard' | '/jobsearch' | '/login'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/jobsearch' | '/login'
-  id: '__root__' | '/' | '/dashboard' | '/jobsearch' | '/login'
+  to: '/' | '/atschecker' | '/dashboard' | '/jobsearch' | '/login'
+  id: '__root__' | '/' | '/atschecker' | '/dashboard' | '/jobsearch' | '/login'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AtscheckerRoute: typeof AtscheckerRoute
   DashboardRoute: typeof DashboardRoute
   JobsearchRoute: typeof JobsearchRoute
   LoginRoute: typeof LoginRoute
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/atschecker': {
+      id: '/atschecker'
+      path: '/atschecker'
+      fullPath: '/atschecker'
+      preLoaderRoute: typeof AtscheckerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AtscheckerRoute: AtscheckerRoute,
   DashboardRoute: DashboardRoute,
   JobsearchRoute: JobsearchRoute,
   LoginRoute: LoginRoute,

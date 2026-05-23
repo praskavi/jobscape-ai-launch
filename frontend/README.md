@@ -43,3 +43,5 @@ Throughout the entire rewrite, **Tailwind CSS v4** styling, OKLCH color tokens, 
 The architecture is now fully prepared for backend integration. To make the app functional:
 1. Wire up **Supabase** or **Firebase** inside `src/controllers/useAuth.ts` and replace the `console.log` statements in the Login/Signup components.
 2. Swap the mock data arrays in `src/models/mockData.ts` with real database fetching logic.
+
+when you what to add new page, first make its page.tsx in src/app then make new file in router folder and then run this command "npm run generate"
