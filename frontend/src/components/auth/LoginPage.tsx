@@ -5,6 +5,7 @@ import { SocialLoginButton } from "./SocialLoginButton";
 import { Divider } from "./Divider";
 import { PasswordInput } from "./PasswordInput";
 import { supabase } from "@/controllers/suabaseClient";
+import { useRouter } from "next/navigation";
 
 const APP_NAME = "JobMatch AI";
 
@@ -32,6 +33,7 @@ export function LoginPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const router = useRouter();
 
   const handleGoogleLogin = () => {
     // TODO: connect Google auth
@@ -72,7 +74,7 @@ export function LoginPage() {
 
       // 3. Success! 
       setSuccessMsg("Logged in successfully!");
-      
+      router.push('/dashboard');
       // TODO: Redirect user to the dashboard 
       // e.g., router.push('/dashboard') or window.location.href = '/dashboard';
 
