@@ -182,7 +182,7 @@ export function LoginPage() {
 
         <div className="mt-6 flex flex-col items-center gap-2 text-sm">
           <Link
-            href="/"
+            href="/forgot-password"
             className="text-muted-foreground transition-colors hover:text-foreground"
           >
             Forgot password?
