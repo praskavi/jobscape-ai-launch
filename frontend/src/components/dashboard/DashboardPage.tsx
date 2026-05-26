@@ -294,7 +294,6 @@ export function DashboardPage() {
               <DocumentSection
                 title="Cover Letter"
                 type="cover_letter"
-                // @ts-ignore
                 doc={coverLetter}
                 onUpload={(f) => handleUpload("cover_letter", f)}
                 onRequestDelete={() => setPendingDelete("cover_letter")}
