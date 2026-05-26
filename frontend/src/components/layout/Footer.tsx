@@ -1,7 +1,6 @@
 "use client";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Briefcase } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Logo } from "./Header";
 import Link from "next/link";
 
 export function Footer() {
@@ -15,7 +14,12 @@ export function Footer() {
     <footer className="border-t border-border bg-surface/60">
       <div className="mx-auto grid max-w-[1280px] gap-10 px-5 py-14 lg:grid-cols-5 lg:px-8">
         <div className="lg:col-span-2">
-          <Logo />
+          <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight hover:cursor-pointer">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+              <Briefcase className="h-4 w-4" />
+            </span>
+            <span className="text-[15px]">Jobscape <span className="text-primary">AI</span></span>
+          </Link>
           <p className="mt-3 max-w-xs text-sm text-muted-foreground">
             AI-powered job search and resume matching. Apply smarter, not harder.
           </p>

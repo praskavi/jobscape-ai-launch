@@ -1,10 +1,8 @@
-import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 
 export function AboutPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Header />
       <main className="mx-auto max-w-3xl px-5 py-12">
         <h1 className="text-3xl font-bold mb-6">About Jobscape AI</h1>
         <p className="mb-4">

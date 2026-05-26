@@ -1,4 +1,3 @@
-import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { PricingSection } from "@/components/landing/Pricing";
 
@@ -11,7 +10,6 @@ export const metadata = {
 export default function Pricing() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Header />
       <main>
         <PricingSection />
       </main>
