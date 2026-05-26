@@ -1,4 +1,3 @@
-import { Header } from "./layout/Header";
 import { Footer } from "./layout/Footer";
 import { HeroSection, TrustStrip } from "./landing/Hero";
 import { FeaturesSection, HowItWorksSection } from "./landing/Features";
@@ -9,7 +8,6 @@ import { TestimonialsSection, FAQSection, CTASection } from "./landing/Testimoni
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground antialiased">
-      <Header />
       <main>
         <HeroSection />
         <TrustStrip />

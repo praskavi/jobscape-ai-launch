@@ -1,4 +1,5 @@
 import "../styles.css";
+import { AppLayoutWrapper } from "@/components/layout/AppLayoutWrapper";
 
 export const metadata = {
   title: "Jobscape AI",
@@ -12,7 +13,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AppLayoutWrapper>
+          {children}
+        </AppLayoutWrapper>
+      </body>
     </html>
   );
 }
