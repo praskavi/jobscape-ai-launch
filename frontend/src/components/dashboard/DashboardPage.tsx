@@ -14,8 +14,8 @@ import { supabase } from "@/controllers/suabaseClient";
 
 export function DashboardPage() {
   const router = useRouter();
-  // Added 'id' to the user state so we can query the database and storage safely
-  const [user, setUser] = React.useState<{ id: string; full_name: string; email: string } | null>(null);
+  // user.id = auth UID (auth.users.id); user.profileId = user_profiles.id (surrogate PK for FK inserts)
+  const [user, setUser] = React.useState<{ id: string; profileId: string; full_name: string; email: string } | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   const [resume, setResume] = React.useState<UserDocument | null>(null);
@@ -36,16 +36,22 @@ export function DashboardPage() {
 
       const userId = session.user.id;
 
-      // 1. Fetch User Profile (Matching our previous fixes)
+      // 1. Fetch User Profile — correct table: user_profiles, match on user_id (auth UUID column)
       let finalName = 'User';
+      let profileId = '';
       const { data: profileData } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', userId)
+        .from('user_profiles')        // was: 'profiles'
+        .select('id, full_name')      // include 'id' (surrogate PK) for FK inserts
+        .eq('user_id', userId)        // was: .eq('id', userId) — user_id holds the auth UUID
         .single();
 
-      if (profileData && profileData.full_name) {
-        finalName = profileData.full_name;
+      if (profileData) {
+        profileId = profileData.id;
+        finalName = profileData.full_name
+          || session.user.user_metadata?.full_name
+          || session.user.user_metadata?.name
+          || session.user.email?.split('@')[0]
+          || 'User';
       } else {
         finalName = session.user.user_metadata?.full_name
           || session.user.user_metadata?.name
@@ -55,35 +61,50 @@ export function DashboardPage() {
 
       setUser({
         id: userId,
+        profileId,                    // surrogate PK — required for inserts into user_files / job_searches
         email: session.user.email || "",
         full_name: finalName,
       });
 
-      // 2. Fetch User Documents from Database
-      // You must create a 'user_documents' table to persist this data!
-      const { data: docsData } = await supabase
-        .from('user_documents')
-        .select('*')
-        .eq('user_id', userId);
+      // 2. Fetch User Files — correct table: user_files; RLS filters by authenticated user automatically
+      const STORAGE_BUCKET = "user-documents"; // correct bucket name
+      const { data: filesData } = await supabase
+        .from('user_files')           // was: 'user_documents'
+        .select('id, file_type, file_name, file_path, bucket_name, mime_type, file_size_bytes, created_at')
+        .order('created_at', { ascending: false });
 
-      if (docsData) {
-        const res = docsData.find(d => d.document_type === 'resume');
-        const cl = docsData.find(d => d.document_type === 'cover_letter');
+      if (filesData && filesData.length > 0) {
+        // Generate signed URLs for each file from file_path (stored path in bucket)
+        const withUrls: UserDocument[] = await Promise.all(
+          filesData.map(async (f) => {
+            const { data: urlData } = await supabase.storage
+              .from(f.bucket_name || STORAGE_BUCKET)
+              .createSignedUrl(f.file_path, 3600); // 1-hour signed URL
+            return {
+              id: f.id,
+              file_type: f.file_type as "resume" | "cover_letter",  // was: document_type
+              file_name: f.file_name,
+              file_path: f.file_path,
+              file_url: urlData?.signedUrl || '',
+              mime_type: f.mime_type,
+              file_size_bytes: f.file_size_bytes,
+              created_at: f.created_at,              // was: uploaded_at
+            };
+          })
+        );
 
-        // If your bucket is private, you would generate signed URLs here. 
-        // Assuming public bucket or stored URLs for now based on your previous setup:
-        if (res) setResume(res as UserDocument);
-        if (cl) setCoverLetter(cl as UserDocument);
+        const res = withUrls.find(d => d.file_type === 'resume');
+        const cl = withUrls.find(d => d.file_type === 'cover_letter');
+        if (res) setResume(res);
+        if (cl) setCoverLetter(cl);
       }
 
-      // 3. Fetch Real Search History
-      // Ensure you have a 'search_history' table
+      // 3. Fetch Recent Searches — correct table: job_searches; RLS handles user filter
       const { data: searchData } = await supabase
-        .from('search_history')
-        .select('*')
-        .eq('user_id', userId)
+        .from('job_searches')         // was: 'search_history'
+        .select('id, keyword, location, created_at')
         .order('created_at', { ascending: false })
-        .limit(5); // Only show the 5 most recent
+        .limit(5);
 
       if (searchData) {
         setSearches(searchData);
@@ -96,51 +117,67 @@ export function DashboardPage() {
   }, [router]);
 
   const handleUpload = async (type: "resume" | "cover_letter", file: File) => {
-    if (!user) return;
+    if (!user || !user.profileId) return;
+
+    const STORAGE_BUCKET = "user-documents"; // correct bucket name (was: "documents")
 
     try {
-      // FIX 1: Use user.id instead of user.email for the storage path
       const fileExt = file.name.split('.').pop();
       const fileName = `${type}_${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
+      const filePath = `${user.id}/${fileName}`; // store under auth UID folder
 
-      // Upload to Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("documents")
+      // 1. Upload to Storage
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: true // Changed to true so users can overwrite their old resumes
+          upsert: true,
         });
 
       if (uploadError) throw uploadError;
 
-      // Generate URL
+      // 2. Generate a short-lived signed URL for immediate UI display
       const { data: urlData, error: urlError } = await supabase.storage
-        .from("documents")
-        .createSignedUrl(filePath, 31536000); // Valid for 1 year instead of 1 hour
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(filePath, 3600); // 1-hour URL; re-fetched on next page load
 
       if (urlError) throw urlError;
 
-      const docPayload = {
-        id: uploadData.path,
-        user_id: user.id,
-        document_type: type,
-        file_name: file.name,
-        file_url: urlData.signedUrl,
-        mime_type: file.type,
-        uploaded_at: new Date().toISOString(), // <-- ADDED THIS LINE
-      };
-
-      // FIX 2: Save metadata to the database so it survives page refreshes
-      const { error: dbError } = await supabase
-        .from('user_documents')
-        .upsert(docPayload); // Upsert allows updating if they already have a resume
+      // 3. Save/update file metadata in user_files
+      //    user_profile_id = surrogate PK from user_profiles (NOT auth UID)
+      //    file_type replaces document_type; file_path is the storage path for later ops
+      const { data: upsertData, error: dbError } = await supabase
+        .from('user_files')                   // was: 'user_documents'
+        .upsert({
+          user_profile_id: user.profileId,    // was: user_id: user.id — must use surrogate PK
+          file_type: type,                    // was: document_type: type
+          file_name: file.name,
+          file_path: filePath,               // storage path — required for delete and signed URL
+          bucket_name: STORAGE_BUCKET,
+          mime_type: file.type,
+          file_size_bytes: file.size,
+        }, {
+          onConflict: 'user_profile_id,file_type', // matches one_file_per_user_per_type constraint
+        })
+        .select('id, created_at')
+        .single();
 
       if (dbError) throw dbError;
 
-      // Update UI
-      if (type === "resume") setResume(docPayload as UserDocument);
-      else setCoverLetter(docPayload as UserDocument);
+      // 4. Update UI state with the full document shape
+      const newDoc: UserDocument = {
+        id: upsertData?.id || '',
+        file_type: type,
+        file_name: file.name,
+        file_path: filePath,
+        file_url: urlData?.signedUrl || '',
+        mime_type: file.type,
+        file_size_bytes: file.size,
+        created_at: upsertData?.created_at || new Date().toISOString(),
+      };
+
+      if (type === "resume") setResume(newDoc);
+      else setCoverLetter(newDoc);
 
     } catch (error: any) {
       console.error("Upload Error:", error.message);
@@ -152,17 +189,19 @@ export function DashboardPage() {
     const docToDelete = pendingDelete === "resume" ? resume : coverLetter;
     if (!docToDelete || !user) return setPendingDelete(null);
 
+    const STORAGE_BUCKET = "user-documents"; // correct bucket name (was: "documents")
+
     try {
-      // 1. Delete from Storage
+      // 1. Delete from Storage using file_path (was incorrectly using docToDelete.id)
       const { error: storageError } = await supabase.storage
-        .from("documents")
-        .remove([docToDelete.id]);
+        .from(STORAGE_BUCKET)
+        .remove([docToDelete.file_path]);   // was: [docToDelete.id] — file_path is the storage key
 
       if (storageError) throw storageError;
 
-      // 2. Delete from Database
+      // 2. Delete row from user_files (was: 'user_documents')
       const { error: dbError } = await supabase
-        .from('user_documents')
+        .from('user_files')               // was: 'user_documents'
         .delete()
         .eq('id', docToDelete.id);
 
