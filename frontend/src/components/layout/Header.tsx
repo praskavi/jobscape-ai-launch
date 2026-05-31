@@ -90,7 +90,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
             <div className="h-12 w-full animate-pulse rounded-full bg-muted" />
           ) : user ? (
             <Link href="/dashboard" onClick={onClose} className="flex items-center justify-center rounded-full bg-foreground py-3 text-sm font-medium text-background">
-              Go to Dashboard
+              Dashboard
             </Link>
           ) : (
             <>
@@ -109,13 +109,12 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
 
   return (
     <header className="sticky top-0 z-30 w-full border-b border-border bg-background/80 backdrop-blur shrink-0">
-      <div className={`flex h-16 items-center justify-between px-5 ${
-        isAppPath ? "w-full" : "mx-auto max-w-[1280px] lg:px-8"
-      }`}>
+      <div className={`flex h-16 items-center justify-between px-5 ${isAppPath ? "w-full" : "mx-auto max-w-[1280px] lg:px-8"
+        }`}>
         <Link href="/" className="hover:cursor-pointer">
           <Logo />
         </Link>
-        
+
         {/* Landing links - hidden on app pages */}
         {!isAppPath && (
           <nav className="hidden items-center gap-8 md:flex">
@@ -143,7 +142,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
                   {getInitials(user.user_metadata?.full_name || user.user_metadata?.name || user.email || "User")}
                 </div>
                 <button
-                  type="button" 
+                  type="button"
                   onClick={handleLogout}
                   className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                 >
@@ -154,7 +153,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
             )
           ) : user ? (
             <Link href="/dashboard" className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-transform hover:scale-[1.02]">
-              Go to Dashboard <ArrowRight className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Go to </span>Dashboard <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           ) : (
             <div className="hidden items-center gap-2 md:flex">
