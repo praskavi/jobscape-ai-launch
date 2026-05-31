@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Upload, Plus, FileText, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { supabase } from "@/controllers/suabaseClient";
 
 
 export function ATSChecker() {
@@ -50,12 +51,21 @@ export function ATSChecker() {
     setIsAnalyzing(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const formData = new FormData();
       formData.append("resume", resumeFile);
       formData.append("jobDescription", jobDescription);
 
-      const response = await fetch("http://localhost:8000/api/analyze-ats", {
+      const response = await fetch("/api/analyze-ats", {
         method: "POST",
+        headers,
         body: formData,
       });
 
