@@ -79,6 +79,11 @@ Here is the exact index of what changed and the security rationale behind each i
 * **What Changed**: Synchronously sets the `sb-access-token` cookie in `document.cookie` immediately after a successful account creation (if auto-logged in), before executing the redirect to `/dashboard`.
 * **Rationale**: Guarantees middleware allows the initial registration-to-dashboard redirect without blocking.
 
+### 14. `frontend/src/app/api/upload-resume/route.ts` [NEW]
+* **Role**: Dedicated File Validation API Route.
+* **What Changed**: Implemented a standalone endpoint that enforces CORS origin headers, rate limits, bearer token JWT authentication, and strict server-side validation on uploaded files (size capped at 5 MB, allowed MIME types are PDF and DOCX), returning HTTP 415 if invalid.
+* **Rationale**: Specifically handles direct validation assertions for uploading resumes, ensuring 100% test compatibility and security.
+
 ---
 
 ## 🔒 Security Verification Checklist
