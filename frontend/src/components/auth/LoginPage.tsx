@@ -65,19 +65,22 @@ export function LoginPage() {
 
     try {
       // 1. Send data to your supabase
-      const {data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password
       });
-      
+
       if (signInError) {
         throw signInError;
       }
 
       // 3. Success! 
+      if (data.session) {
+        document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax; Secure`;
+      }
       setSuccessMsg("Logged in successfully!");
       router.push('/dashboard');
-      // TODO: Redirect user to the dashboard 
+      // TODO: Redirect user to the dashboard s
       // e.g., router.push('/dashboard') or window.location.href = '/dashboard';
 
     } catch (err: any) {
@@ -164,7 +167,7 @@ export function LoginPage() {
               {error}
             </p>
           )}
-          
+
           {successMsg && (
             <p role="alert" className="text-xs font-medium text-green-600 dark:text-green-400">
               {successMsg}
