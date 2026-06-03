@@ -88,9 +88,6 @@ export function SignupPage() {
       }
 
       // Success! Show popup/message and redirect
-      if (data.session) {
-        document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax; Secure`;
-      }
       setSuccessMsg("Signup successful! Please check your email box to confirm it's you.");
       setName("");
       setEmail("");

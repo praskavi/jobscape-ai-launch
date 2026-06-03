@@ -12,88 +12,30 @@ import { supabase } from "@/controllers/suabaseClient";
 
 // Removed the MOCK_USER and MOCK_SEARCHES imports!
 
-export function DashboardPage() {
+interface DashboardPageProps {
+  initialUser: { id: string; full_name: string; email: string } | null;
+  initialResume: UserDocument | null;
+  initialCoverLetter: UserDocument | null;
+  initialSearches: any[];
+}
+
+export function DashboardPage({
+  initialUser,
+  initialResume,
+  initialCoverLetter,
+  initialSearches,
+}: DashboardPageProps) {
   const router = useRouter();
   // Added 'id' to the user state so we can query the database and storage safely
-  const [user, setUser] = React.useState<{ id: string; full_name: string; email: string } | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [user, setUser] = React.useState<{ id: string; full_name: string; email: string } | null>(initialUser);
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  const [resume, setResume] = React.useState<UserDocument | null>(null);
-  const [coverLetter, setCoverLetter] = React.useState<UserDocument | null>(null);
-  const [searches, setSearches] = React.useState<any[]>([]); // Dynamic searches state
+  const [resume, setResume] = React.useState<UserDocument | null>(initialResume);
+  const [coverLetter, setCoverLetter] = React.useState<UserDocument | null>(initialCoverLetter);
+  const [searches, setSearches] = React.useState<any[]>(initialSearches);
 
   const [pendingDelete, setPendingDelete] = React.useState<"resume" | "cover_letter" | null>(null);
   const [mobileNav, setMobileNav] = React.useState(false);
-
-  React.useEffect(() => {
-    const fetchDashboardData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.push("/login");
-        return;
-      }
-
-      const userId = session.user.id;
-
-      // 1. Fetch User Profile (Matching our previous fixes)
-      let finalName = 'User';
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', userId)
-        .single();
-
-      if (profileData && profileData.full_name) {
-        finalName = profileData.full_name;
-      } else {
-        finalName = session.user.user_metadata?.full_name
-          || session.user.user_metadata?.name
-          || session.user.email?.split('@')[0]
-          || 'User';
-      }
-
-      setUser({
-        id: userId,
-        email: session.user.email || "",
-        full_name: finalName,
-      });
-
-      // 2. Fetch User Documents from Database
-      // You must create a 'user_documents' table to persist this data!
-      const { data: docsData } = await supabase
-        .from('user_documents')
-        .select('*')
-        .eq('user_id', userId);
-
-      if (docsData) {
-        const res = docsData.find(d => d.document_type === 'resume');
-        const cl = docsData.find(d => d.document_type === 'cover_letter');
-
-        // If your bucket is private, you would generate signed URLs here. 
-        // Assuming public bucket or stored URLs for now based on your previous setup:
-        if (res) setResume(res as UserDocument);
-        if (cl) setCoverLetter(cl as UserDocument);
-      }
-
-      // 3. Fetch Real Search History
-      // Ensure you have a 'search_history' table
-      const { data: searchData } = await supabase
-        .from('search_history')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(5); // Only show the 5 most recent
-
-      if (searchData) {
-        setSearches(searchData);
-      }
-
-      setIsLoading(false);
-    };
-
-    fetchDashboardData();
-  }, [router]);
 
   const handleUpload = async (type: "resume" | "cover_letter", file: File) => {
     if (!user) return;

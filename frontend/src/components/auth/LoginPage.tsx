@@ -75,9 +75,6 @@ export function LoginPage() {
       }
 
       // 3. Success! 
-      if (data.session) {
-        document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax; Secure`;
-      }
       setSuccessMsg("Logged in successfully!");
       router.push('/dashboard');
       // TODO: Redirect user to the dashboard s
