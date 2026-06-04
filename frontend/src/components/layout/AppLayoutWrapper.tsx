@@ -16,25 +16,16 @@ export function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
   const [mobileNav, setMobileNav] = React.useState(false);
 
   React.useEffect(() => {
-    // 1. Get initial session and write to cookies
+    // 1. Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
-      if (session) {
-        document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax; Secure`;
-      }
     });
 
-    // 2. Listen to active auth session changes and sync to cookies
+    // 2. Listen to active auth session changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
-      if (session) {
-        document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax; Secure`;
-      } else {
-        // Delete cookie on logout
-        document.cookie = "sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure";
-      }
     });
 
     return () => {

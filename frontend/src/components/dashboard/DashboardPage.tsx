@@ -12,109 +12,30 @@ import { supabase } from "@/controllers/suabaseClient";
 
 // Removed the MOCK_USER and MOCK_SEARCHES imports!
 
-export function DashboardPage() {
-  const router = useRouter();
-  // user.id = auth UID (auth.users.id); user.profileId = user_profiles.id (surrogate PK for FK inserts)
-  const [user, setUser] = React.useState<{ id: string; profileId: string; full_name: string; email: string } | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+interface DashboardPageProps {
+  initialUser: { id: string; full_name: string; email: string } | null;
+  initialResume: UserDocument | null;
+  initialCoverLetter: UserDocument | null;
+  initialSearches: any[];
+}
 
-  const [resume, setResume] = React.useState<UserDocument | null>(null);
-  const [coverLetter, setCoverLetter] = React.useState<UserDocument | null>(null);
-  const [searches, setSearches] = React.useState<any[]>([]); // Dynamic searches state
+export function DashboardPage({
+  initialUser,
+  initialResume,
+  initialCoverLetter,
+  initialSearches,
+}: DashboardPageProps) {
+  const router = useRouter();
+  // Added 'id' to the user state so we can query the database and storage safely
+  const [user, setUser] = React.useState<{ id: string; full_name: string; email: string } | null>(initialUser);
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  const [resume, setResume] = React.useState<UserDocument | null>(initialResume);
+  const [coverLetter, setCoverLetter] = React.useState<UserDocument | null>(initialCoverLetter);
+  const [searches, setSearches] = React.useState<any[]>(initialSearches);
 
   const [pendingDelete, setPendingDelete] = React.useState<"resume" | "cover_letter" | null>(null);
   const [mobileNav, setMobileNav] = React.useState(false);
-
-  React.useEffect(() => {
-    const fetchDashboardData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.push("/login");
-        return;
-      }
-
-      const userId = session.user.id;
-
-      // 1. Fetch User Profile — correct table: user_profiles, match on user_id (auth UUID column)
-      let finalName = 'User';
-      let profileId = '';
-      const { data: profileData } = await supabase
-        .from('user_profiles')        // was: 'profiles'
-        .select('id, full_name')      // include 'id' (surrogate PK) for FK inserts
-        .eq('user_id', userId)        // was: .eq('id', userId) — user_id holds the auth UUID
-        .single();
-
-      if (profileData) {
-        profileId = profileData.id;
-        finalName = profileData.full_name
-          || session.user.user_metadata?.full_name
-          || session.user.user_metadata?.name
-          || session.user.email?.split('@')[0]
-          || 'User';
-      } else {
-        finalName = session.user.user_metadata?.full_name
-          || session.user.user_metadata?.name
-          || session.user.email?.split('@')[0]
-          || 'User';
-      }
-
-      setUser({
-        id: userId,
-        profileId,                    // surrogate PK — required for inserts into user_files / job_searches
-        email: session.user.email || "",
-        full_name: finalName,
-      });
-
-      // 2. Fetch User Files — correct table: user_files; RLS filters by authenticated user automatically
-      const STORAGE_BUCKET = "user-documents"; // correct bucket name
-      const { data: filesData } = await supabase
-        .from('user_files')           // was: 'user_documents'
-        .select('id, file_type, file_name, file_path, bucket_name, mime_type, file_size_bytes, created_at')
-        .order('created_at', { ascending: false });
-
-      if (filesData && filesData.length > 0) {
-        // Generate signed URLs for each file from file_path (stored path in bucket)
-        const withUrls: UserDocument[] = await Promise.all(
-          filesData.map(async (f) => {
-            const { data: urlData } = await supabase.storage
-              .from(f.bucket_name || STORAGE_BUCKET)
-              .createSignedUrl(f.file_path, 3600); // 1-hour signed URL
-            return {
-              id: f.id,
-              file_type: f.file_type as "resume" | "cover_letter",  // was: document_type
-              file_name: f.file_name,
-              file_path: f.file_path,
-              file_url: urlData?.signedUrl || '',
-              mime_type: f.mime_type,
-              file_size_bytes: f.file_size_bytes,
-              created_at: f.created_at,              // was: uploaded_at
-            };
-          })
-        );
-
-        const res = withUrls.find(d => d.file_type === 'resume');
-        const cl = withUrls.find(d => d.file_type === 'cover_letter');
-        if (res) setResume(res);
-        if (cl) setCoverLetter(cl);
-      }
-
-      // 3. Fetch Recent Searches — correct table: job_searches; RLS handles user filter
-      const { data: searchData } = await supabase
-        .from('job_searches')         // was: 'search_history'
-        .select('id, keyword, location, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (searchData) {
-        setSearches(searchData);
-      }
-
-      setIsLoading(false);
-    };
-
-    fetchDashboardData();
-  }, [router]);
 
   const handleUpload = async (type: "resume" | "cover_letter", file: File) => {
     if (!user || !user.profileId) return;
