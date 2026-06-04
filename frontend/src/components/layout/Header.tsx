@@ -38,7 +38,7 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push("/login");
+    router.push("/");
   };
 
   useEffect(() => {
