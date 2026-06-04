@@ -34,7 +34,7 @@ export function DocumentCard({
             <FileTypeBadge type={type} />
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Uploaded {formatDate(doc.uploaded_at)}
+            Uploaded {formatDate(doc.created_at)}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <a

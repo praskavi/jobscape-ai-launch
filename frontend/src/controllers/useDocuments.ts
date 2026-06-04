@@ -4,11 +4,13 @@ import { validateFile } from "../models/documentModel";
 
 export interface UserDocument {
   id: string;
-  document_type: "resume" | "cover_letter";
+  file_type: "resume" | "cover_letter";  // was: document_type (renamed to match user_files.file_type)
   file_name: string;
-  file_url: string;
+  file_path: string;                      // storage path — required for signed URL generation and delete
+  file_url: string;                       // generated signed URL (not stored in DB)
   mime_type: string;
-  uploaded_at: string;
+  file_size_bytes?: number | null;
+  created_at: string;                     // was: uploaded_at (matches user_files.created_at)
 }
 
 export function useDocuments(initialDocs: UserDocument[] = []) {

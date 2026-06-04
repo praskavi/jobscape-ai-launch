@@ -54,9 +54,9 @@ const JobSearchPage: React.FC = () => {
 
           // Step A: Fetch the name from the custom profiles table
           const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
+            .from('user_profiles')        // was: 'profiles' — correct table name
             .select('full_name')
-            .eq('id', user.id)
+            .eq('user_id', user.id)       // was: .eq('id', user.id) — match on auth UUID column
             .single();
 
           if (profileData && profileData.full_name) {

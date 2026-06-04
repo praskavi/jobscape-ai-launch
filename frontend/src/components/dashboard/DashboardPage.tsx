@@ -38,51 +38,67 @@ export function DashboardPage({
   const [mobileNav, setMobileNav] = React.useState(false);
 
   const handleUpload = async (type: "resume" | "cover_letter", file: File) => {
-    if (!user) return;
+    if (!user || !user.profileId) return;
+
+    const STORAGE_BUCKET = "user-documents"; // correct bucket name (was: "documents")
 
     try {
-      // FIX 1: Use user.id instead of user.email for the storage path
       const fileExt = file.name.split('.').pop();
       const fileName = `${type}_${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
+      const filePath = `${user.id}/${fileName}`; // store under auth UID folder
 
-      // Upload to Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("documents")
+      // 1. Upload to Storage
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: true // Changed to true so users can overwrite their old resumes
+          upsert: true,
         });
 
       if (uploadError) throw uploadError;
 
-      // Generate URL
+      // 2. Generate a short-lived signed URL for immediate UI display
       const { data: urlData, error: urlError } = await supabase.storage
-        .from("documents")
-        .createSignedUrl(filePath, 31536000); // Valid for 1 year instead of 1 hour
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(filePath, 3600); // 1-hour URL; re-fetched on next page load
 
       if (urlError) throw urlError;
 
-      const docPayload = {
-        id: uploadData.path,
-        user_id: user.id,
-        document_type: type,
-        file_name: file.name,
-        file_url: urlData.signedUrl,
-        mime_type: file.type,
-        uploaded_at: new Date().toISOString(), // <-- ADDED THIS LINE
-      };
-
-      // FIX 2: Save metadata to the database so it survives page refreshes
-      const { error: dbError } = await supabase
-        .from('user_documents')
-        .upsert(docPayload); // Upsert allows updating if they already have a resume
+      // 3. Save/update file metadata in user_files
+      //    user_profile_id = surrogate PK from user_profiles (NOT auth UID)
+      //    file_type replaces document_type; file_path is the storage path for later ops
+      const { data: upsertData, error: dbError } = await supabase
+        .from('user_files')                   // was: 'user_documents'
+        .upsert({
+          user_profile_id: user.profileId,    // was: user_id: user.id — must use surrogate PK
+          file_type: type,                    // was: document_type: type
+          file_name: file.name,
+          file_path: filePath,               // storage path — required for delete and signed URL
+          bucket_name: STORAGE_BUCKET,
+          mime_type: file.type,
+          file_size_bytes: file.size,
+        }, {
+          onConflict: 'user_profile_id,file_type', // matches one_file_per_user_per_type constraint
+        })
+        .select('id, created_at')
+        .single();
 
       if (dbError) throw dbError;
 
-      // Update UI
-      if (type === "resume") setResume(docPayload as UserDocument);
-      else setCoverLetter(docPayload as UserDocument);
+      // 4. Update UI state with the full document shape
+      const newDoc: UserDocument = {
+        id: upsertData?.id || '',
+        file_type: type,
+        file_name: file.name,
+        file_path: filePath,
+        file_url: urlData?.signedUrl || '',
+        mime_type: file.type,
+        file_size_bytes: file.size,
+        created_at: upsertData?.created_at || new Date().toISOString(),
+      };
+
+      if (type === "resume") setResume(newDoc);
+      else setCoverLetter(newDoc);
 
     } catch (error: any) {
       console.error("Upload Error:", error.message);
@@ -94,17 +110,19 @@ export function DashboardPage({
     const docToDelete = pendingDelete === "resume" ? resume : coverLetter;
     if (!docToDelete || !user) return setPendingDelete(null);
 
+    const STORAGE_BUCKET = "user-documents"; // correct bucket name (was: "documents")
+
     try {
-      // 1. Delete from Storage
+      // 1. Delete from Storage using file_path (was incorrectly using docToDelete.id)
       const { error: storageError } = await supabase.storage
-        .from("documents")
-        .remove([docToDelete.id]);
+        .from(STORAGE_BUCKET)
+        .remove([docToDelete.file_path]);   // was: [docToDelete.id] — file_path is the storage key
 
       if (storageError) throw storageError;
 
-      // 2. Delete from Database
+      // 2. Delete row from user_files (was: 'user_documents')
       const { error: dbError } = await supabase
-        .from('user_documents')
+        .from('user_files')               // was: 'user_documents'
         .delete()
         .eq('id', docToDelete.id);
 
