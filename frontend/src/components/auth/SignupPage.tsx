@@ -39,9 +39,19 @@ export function SignupPage() {
   
   const router = useRouter();
 
-  const handleGoogleSignup = () => {
-    // TODO: connect Google auth
-    console.log("Google signup");
+  const handleGoogleSignup = async () => {
+    setError(null);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
   const handleTwitterSignup = () => {
