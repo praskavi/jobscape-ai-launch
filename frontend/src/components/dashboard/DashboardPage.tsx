@@ -13,7 +13,7 @@ import { supabase } from "@/controllers/suabaseClient";
 // Removed the MOCK_USER and MOCK_SEARCHES imports!
 
 interface DashboardPageProps {
-  initialUser: { id: string; full_name: string; email: string } | null;
+  initialUser: { id: string; full_name: string; email: string; profileId: string } | null;
   initialResume: UserDocument | null;
   initialCoverLetter: UserDocument | null;
   initialSearches: any[];
@@ -26,8 +26,8 @@ export function DashboardPage({
   initialSearches,
 }: DashboardPageProps) {
   const router = useRouter();
-  // Added 'id' to the user state so we can query the database and storage safely
-  const [user, setUser] = React.useState<{ id: string; full_name: string; email: string } | null>(initialUser);
+  // Added 'id' and 'profileId' to the user state so we can query the database and storage safely
+  const [user, setUser] = React.useState<{ id: string; full_name: string; email: string; profileId: string } | null>(initialUser);
   const [isLoading, setIsLoading] = React.useState(false);
 
   const [resume, setResume] = React.useState<UserDocument | null>(initialResume);
