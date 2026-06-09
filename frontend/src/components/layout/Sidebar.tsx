@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileStack, Search, Settings as SettingsIcon, FileSearch } from "lucide-react";
+import { LayoutDashboard, FileStack, Search, Settings as SettingsIcon, FileSearch, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -11,7 +11,8 @@ const NAV = [
   { label: "Resume & Cover Letter", href: "/documents", icon: FileStack },
   { label: "Job Searches", href: "/jobsearch", icon: Search },
   { label: "Settings", href: "/settings", icon: SettingsIcon },
-  { label: "ATS Checker", href: "/atschecker", icon: FileSearch }
+  { label: "ATS Checker", href: "/atschecker", icon: FileSearch },
+  { label: "AI Job Match", href: "/aijobmatch", icon: Target }
 ];
 
 export function Sidebar({ onNavigate, isCollapsed }: { onNavigate?: () => void; isCollapsed?: boolean }) {
