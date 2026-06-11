@@ -24,22 +24,31 @@ export function ResetPasswordPage() {
 
     const initializeRecoverySession = async () => {
       const code = searchParams.get("code");
+      let exchangeErrorMessage: string | null = null;
 
-      if (!code) {
-        if (isMounted) {
-          setInitializing(false);
-        }
-        return;
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        exchangeErrorMessage = exchangeError?.message ?? null;
       }
 
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
       if (!isMounted) {
         return;
       }
 
-      if (exchangeError) {
-        setError(exchangeError.message || "This password reset link is invalid or has expired.");
+      if (session) {
+        if (code) {
+          window.history.replaceState(null, "", "/reset-password");
+        }
+        setError(null);
+      } else {
+        setError(
+          exchangeErrorMessage ||
+            "This password reset link is invalid or has expired. Please request a new reset link.",
+        );
       }
 
       setInitializing(false);
@@ -71,6 +80,16 @@ export function ResetPasswordPage() {
     }
 
     setLoading(true);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      setLoading(false);
+      setError("Your password reset session has expired. Please request a new reset link.");
+      return;
+    }
+
     // The reset email opens this page with a short-lived Supabase recovery
     // session. updateUser changes only the password for that recovered user.
     const { error: updateError } = await supabase.auth.updateUser({ password });
@@ -122,7 +141,7 @@ export function ResetPasswordPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               minLength={8}
-              disabled={loading}
+              disabled={loading || initializing}
               required
             />
           </div>
@@ -138,7 +157,7 @@ export function ResetPasswordPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               minLength={8}
-              disabled={loading}
+              disabled={loading || initializing}
               required
             />
           </div>
