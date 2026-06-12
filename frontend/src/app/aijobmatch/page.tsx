@@ -1,4 +1,4 @@
-import { AIJobMatch } from "@/components/AIJobMatch/AIJobMatch";
+import {AIJobMatch } from "@/components/AIJobMatch/AIJobMatch";
 
 export default function AIJobMatchPage() {
   return (
