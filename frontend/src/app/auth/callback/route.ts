@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const { searchParams } = requestUrl;
   const code = searchParams.get('code');
   const type = searchParams.get('type');
   // If "next" is in param, use it as the redirect destination
   const next = searchParams.get('next') ?? (type === 'recovery' ? '/reset-password' : '/dashboard');
+  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const host = forwardedHost || request.headers.get('host');
+  const protocol = forwardedProto || requestUrl.protocol.replace(':', '');
+  const origin = host ? `${protocol}://${host}` : requestUrl.origin;
 
   if (code) {
     const supabase = await createClient();
