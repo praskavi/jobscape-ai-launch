@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Briefcase } from "lucide-react";
+import { Briefcase, ArrowLeft } from "lucide-react";
 import { SocialLoginButton } from "./SocialLoginButton";
 import { Divider } from "./Divider";
 import { PasswordInput } from "./PasswordInput";
@@ -117,10 +117,20 @@ export function SignupPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+
+      <button 
+        onClick={() => router.push('/')}
+        className="absolute left-6 top-6 sm:left-10 sm:top-10 flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md px-2 py-1"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Home
+      </button>
+
       <section
         aria-labelledby="signup-heading"
         className="w-full max-w-[400px] rounded-xl border border-border bg-surface p-8 shadow-soft"
       >
+        
         <div className="flex flex-col items-center text-center">
           <div
             aria-hidden="true"
