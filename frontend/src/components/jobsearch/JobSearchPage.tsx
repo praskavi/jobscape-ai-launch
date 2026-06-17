@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/controllers/suabaseClient';
-
-import { Search } from 'lucide-react';
+import { useRouter } from 'next/navigation'; // NEW: Import Next.js router
+import { Search, X } from 'lucide-react'; // NEW: Added X icon for modal close
 
 // Define the Job structure based on your Supabase columns
 interface Job {
@@ -25,21 +25,23 @@ interface Job {
 }
 
 const JobSearchPage: React.FC = () => {
+  const router = useRouter(); // NEW: Initialize router
+
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // FIXED: Consolidated user profile state for the header and welcome text
   const [userProfile, setUserProfile] = useState<{ full_name: string; email: string }>({
     full_name: 'User',
     email: '',
   });
 
-  // FIXED: Added missing state for mobile menu toggle
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const item_per_page = 100;
+
+  // NEW: State to track which job is currently selected for the modal
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -54,16 +56,15 @@ const JobSearchPage: React.FC = () => {
 
           // Step A: Fetch the name from the custom profiles table
           const { data: profileData, error: profileError } = await supabase
-            .from('user_profiles')        // was: 'profiles' — correct table name
+            .from('user_profiles')
             .select('full_name')
-            .eq('user_id', user.id)       // was: .eq('id', user.id) — match on auth UUID column
+            .eq('user_id', user.id)
             .single();
 
           if (profileData && profileData.full_name) {
             finalName = profileData.full_name;
-          }
-          // Step B: Fallback to Auth metadata or email prefix
-          else {
+          } else {
+            // Step B: Fallback
             finalName = user.user_metadata?.full_name
               || user.user_metadata?.name
               || user.email?.split('@')[0]
@@ -79,7 +80,7 @@ const JobSearchPage: React.FC = () => {
         // 2. Fetch Jobs
         const { data: jobsData, error: jobsError } = await supabase
           .from('jobs')
-          .select('source, title, company, location, city, state, salary, description, country, classification, sub_classification, work_arrangement, employment_type, apply_url');
+          .select('id, source, title, company, location, city, state, salary, description, country, classification, sub_classification, work_arrangement, employment_type, apply_url'); // MODIFIED: Added 'id' to select if not already there
 
         if (jobsError) throw jobsError;
         if (jobsData) setJobs(jobsData as Job[]);
@@ -94,13 +95,12 @@ const JobSearchPage: React.FC = () => {
     fetchInitialData();
   }, []);
 
-  // FIXED: Added missing logout handler
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.href = '/'; // Adjust this redirect if your login page is elsewhere
+    window.location.href = '/'; 
   };
 
-  // Filter jobs based on search query
+  
   const filteredJobs = jobs.filter((job) => {
     const query = searchQuery.toLowerCase();
     return (
@@ -112,16 +112,20 @@ const JobSearchPage: React.FC = () => {
     );
   });
 
-  // Reset to page 1 whenever the user types in the search bar
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
 
-  // Pagination logic applied to the *filtered* jobs list
   const indexOfLastItem = currentPage * item_per_page;
   const indexOfFirstItem = indexOfLastItem - item_per_page;
   const currentJobs = filteredJobs.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredJobs.length / item_per_page);
+
+  const handleAtsCheck = (job: Job) => {
+    const params = new URLSearchParams();
+    params.set('jd', job.description);
+    router.push(`/atschecker?${params.toString()}`);
+  };
 
   return (
     <div className="p-4 md:p-8">
@@ -180,7 +184,12 @@ const JobSearchPage: React.FC = () => {
                   {currentJobs.map((job, index) => {
                     const globalIndex = indexOfFirstItem + index + 1;
                     return (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
+                      <tr 
+                        key={index} 
+                        // MODIFIED: Added onClick to open modal and cursor-pointer
+                        onClick={() => setSelectedJob(job)}
+                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
                         <td className="px-4 py-4 text-center font-mono text-xs text-gray-400">
                           {globalIndex}
                         </td>
@@ -207,7 +216,13 @@ const JobSearchPage: React.FC = () => {
                           <div className="text-xs text-gray-400">{job.sub_classification}</div>
                         </td>
                         <td className="px-6 py-4 text-xs text-gray-500 capitalize">{job.source}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        
+                        {/* MODIFIED: Added e.stopPropagation() so clicking Apply doesn't open the modal */}
+                        <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <button onClick={() => handleAtsCheck(job)} className='inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition'>
+                            ATS Check
+                          </button>
+
                           {job.apply_url ? (
                             <a
                               href={job.apply_url}
@@ -227,6 +242,8 @@ const JobSearchPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            
+            {/* Pagination block remains unchanged */}
             <div className="bg-white px-6 py-4 flex flex-col sm:flex-row items-center justify-between border-t border-gray-200 gap-4">
               <div className="text-sm text-gray-500">
                 Showing <span className="font-medium">{filteredJobs.length === 0 ? 0 : indexOfFirstItem + 1}</span> to{' '}
@@ -253,9 +270,39 @@ const JobSearchPage: React.FC = () => {
           </React.Fragment>
         )}
       </div>
+
+      {/* NEW: Job Detail Modal */}
+      {selectedJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 transition-opacity">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col relative">
+            
+            {/* Modal Header */}
+            <div className="flex justify-between items-start p-6 border-b border-gray-200">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{selectedJob.title}</h2>
+                <p className="text-sm text-gray-500 mt-1">{selectedJob.company} • {selectedJob.location || selectedJob.city}</p>
+              </div>
+              <button 
+                onClick={() => setSelectedJob(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Modal Body (Scrollable Job Description) */}
+            <div className="p-6 overflow-y-auto flex-1">
+              <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">Job Description</h3>
+              <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                {selectedJob.description || "No description provided."}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
-
 
 export default JobSearchPage;

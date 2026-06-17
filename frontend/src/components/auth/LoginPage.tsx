@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Briefcase } from "lucide-react";
+import { Briefcase, ArrowLeft } from "lucide-react"; // Added ArrowLeft
 import { SocialLoginButton } from "./SocialLoginButton";
 import { Divider } from "./Divider";
 import { PasswordInput } from "./PasswordInput";
@@ -74,7 +74,6 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
-      // 1. Send data to your supabase
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -84,11 +83,8 @@ export function LoginPage() {
         throw signInError;
       }
 
-      // 3. Success! 
       setSuccessMsg("Logged in successfully!");
       router.push('/dashboard');
-      // TODO: Redirect user to the dashboard s
-      // e.g., router.push('/dashboard') or window.location.href = '/dashboard';
 
     } catch (err: any) {
       setError(err.message);
@@ -98,27 +94,37 @@ export function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+    <main className="relative flex min-h-screen items-center justify-center bg-background px-4 py-10">
+      
+      <button 
+        onClick={() => router.push('/')}
+        className="absolute left-6 top-6 sm:left-10 sm:top-10 flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md px-2 py-1"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Home
+      </button>
+      
       <section
         aria-labelledby="login-heading"
-        className="w-full max-w-[400px] rounded-xl border border-border bg-surface p-8 shadow-soft"
+        // FIX 2: Slightly increased max-width for better breathing room, upgraded border-radius and shadow
+        className="w-full max-w-[420px] rounded-2xl border border-border bg-surface p-8 sm:p-10 shadow-xl"
       >
         <div className="flex flex-col items-center text-center">
           <div
             aria-hidden="true"
-            className="flex h-16 w-16 items-center justify-center rounded-2xl bg-foreground text-background shadow-soft"
+            className="flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground text-background shadow-md"
           >
-            <Briefcase className="h-7 w-7" />
+            <Briefcase className="h-6 w-6" />
           </div>
-          <h1 id="login-heading" className="mt-5 text-2xl font-bold tracking-tight text-foreground">
+          <h1 id="login-heading" className="mt-6 text-2xl font-bold tracking-tight text-foreground">
             Login to {APP_NAME}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Welcome back. Pick up where you left off.
           </p>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3">
+        <div className="mt-8 flex flex-col gap-3">
           <SocialLoginButton
             icon={<GoogleIcon />}
             label="Continue with Google"
@@ -131,12 +137,12 @@ export function LoginPage() {
           />
         </div>
 
-        <div className="my-5">
+        <div className="my-6">
           <Divider label="or login with email" />
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3" noValidate>
-          <div className="flex flex-col gap-1.5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+          <div className="flex flex-col gap-2">
             <label htmlFor="email" className="sr-only">
               Email address
             </label>
@@ -148,12 +154,12 @@ export function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
-              className="h-10 w-full rounded-lg border border-input bg-surface px-3 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              className="h-11 w-full rounded-lg border border-input bg-surface px-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               required
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="password" className="sr-only">
               Password
             </label>
@@ -166,40 +172,46 @@ export function LoginPage() {
               disabled={isLoading}
               minLength={8}
               required
+              // Assuming PasswordInput accepts className props to match the email input height
+              className="h-11" 
             />
           </div>
 
           {error && (
-            <p role="alert" className="text-xs font-medium text-destructive">
-              {error}
-            </p>
+            <div className="rounded-md bg-destructive/10 p-3">
+              <p role="alert" className="text-sm font-medium text-destructive text-center">
+                {error}
+              </p>
+            </div>
           )}
 
           {successMsg && (
-            <p role="alert" className="text-xs font-medium text-green-600 dark:text-green-400">
-              {successMsg}
-            </p>
+            <div className="rounded-md bg-green-500/10 p-3">
+              <p role="alert" className="text-sm font-medium text-green-600 dark:text-green-400 text-center">
+                {successMsg}
+              </p>
+            </div>
           )}
 
           <button
             type="submit"
             disabled={isLoading}
-            className="mt-1 h-10 w-full rounded-lg bg-foreground text-sm font-semibold text-background transition-colors hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-70 disabled:cursor-not-allowed"
+            className="mt-2 h-11 w-full rounded-lg bg-foreground text-sm font-semibold text-background transition-all hover:bg-foreground/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-70"
           >
             {isLoading ? "Logging in..." : "Log in"}
           </button>
         </form>
 
-        <div className="mt-6 flex flex-col items-center gap-2 text-sm">
+        <div className="mt-8 flex flex-col items-center gap-3 text-sm">
           <Link
             href="/forgot-password"
-            className="text-muted-foreground transition-colors hover:text-foreground"
+            className="font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            Forgot password?
+            Forgot your password?
           </Link>
           <p className="text-muted-foreground">
             Don't have an account?{" "}
-            <Link href="/register" className="font-semibold text-foreground hover:underline">
+            <Link href="/register" className="font-semibold text-foreground hover:underline underline-offset-4">
               Sign up
             </Link>
           </p>
