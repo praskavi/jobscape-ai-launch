@@ -1,6 +1,27 @@
 import { NextResponse } from "next/server";
 
-const ALLOWED_ORIGINS = ["https://jobscapeai.com", "http://localhost:3000"];
+const ALLOWED_ORIGINS = [
+  "https://jobscapeai.com",
+  "https://jobscrape-ai-j8fxn.ondigitalocean.app",
+  "http://localhost:3000",
+];
+const LOCAL_DEVELOPMENT_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+function isAllowedOrigin(origin: string) {
+  try {
+    const url = new URL(origin);
+
+    // Next can move to 3001/3002 when 3000 is busy, so allow localhost
+    // development origins without weakening production CORS.
+    if (LOCAL_DEVELOPMENT_HOSTS.has(url.hostname)) {
+      return true;
+    }
+
+    return ALLOWED_ORIGINS.includes(origin);
+  } catch {
+    return false;
+  }
+}
 
 export function handleCors(req: Request, res?: NextResponse) {
   const origin = req.headers.get("origin");
@@ -10,7 +31,7 @@ export function handleCors(req: Request, res?: NextResponse) {
     return { response: res || null, isAllowed: true };
   }
 
-  if (!ALLOWED_ORIGINS.includes(origin)) {
+  if (!isAllowedOrigin(origin)) {
     return {
       response: NextResponse.json(
         { error: "CORS policy violation: Origin not allowed" },
