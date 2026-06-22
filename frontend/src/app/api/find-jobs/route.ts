@@ -3,50 +3,18 @@ import { verifyApiUser } from "@/lib/auth/verifyApiUser";
 import { handleCors } from "@/lib/cors";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { extractTextFromFile } from "@/lib/parsers/extractText";
+import {
+  calculateSemanticAtsScore,
+  calculateSemanticAtsScoreFromProfile,
+  createSemanticResumeProfile,
+  type SemanticResumeProfile,
+} from "@/lib/semanticAtsScoring";
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! // Ensure you use the Service Role Key here
 );
-
-// --- UNIFIED HYBRID ENGINE: Keyword Matcher ---
-function calculateAtsScore(resumeText: string, jdText: string) {
-  const stopWords = new Set(['and', 'the', 'for', 'with', 'this', 'that', 'you', 'your', 'are', 'will', 'can', 'have', 'from', 'but', 'not', 'what', 'all', 'were', 'when', 'how', 'any', 'about', 'more', 'our', 'out', 'has', 'must', 'only', 'also', 'such', 'some', 'they', 'their', 'which', 'who', 'whom', 'whose', 'why', 'would', 'should', 'could', 'was', 'been', 'being', 'does', 'doing', 'did', 'done', 'experience', 'years', 'team', 'work', 'required', 'preferred', 'skills', 'strong', 'ability', 'working', 'environment', 'include', 'duties', 'role', 'responsibilities', 'knowledge', 'including', 'support', 'management', 'development', 'business', 'ensure', 'provide', 'using', 'design', 'new', 'within', 'looking', 'about', 'this', 'role']);
-
-  const cleanText = (text: string) => (text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
-
-  const getKeywords = (text: string) => {
-    const words = cleanText(text).split(/\s+/);
-    const wordCounts = new Map<string, number>();
-    
-    for (const w of words) {
-      if (w.length > 3 && !stopWords.has(w) && isNaN(Number(w))) {
-        wordCounts.set(w, (wordCounts.get(w) || 0) + 1);
-      }
-    }
-    
-    return Array.from(wordCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(entry => entry[0]);
-  };
-
-  // Extract Top 20 core technical/hard skills
-  const jdKeywords = getKeywords(jdText).slice(0, 20);
-  const resumeCleaned = ` ${cleanText(resumeText)} `;
-
-  const matchedKeywords = jdKeywords.filter(kw => resumeCleaned.includes(` ${kw} `));
-  const missingKeywords = jdKeywords.filter(kw => !resumeCleaned.includes(` ${kw} `));
-
-  let score = 0;
-  if (jdKeywords.length > 0) {
-    // ATS Curve: Matching 15 out of 20 core keywords equals a 100% score.
-    const targetCount = Math.min(jdKeywords.length, 15);
-    score = Math.min(100, Math.round((matchedKeywords.length / targetCount) * 100));
-  }
-
-  return { score, matchedKeywords, missingKeywords };
-}
 
 export async function POST(request: Request) {
   const corsResponse = handleCors(request);
@@ -131,10 +99,21 @@ export async function POST(request: Request) {
     });
 
     const matchedJobs = Array.from(jobMap.values());
+    let semanticResumeProfile: SemanticResumeProfile | null = null;
+    try {
+      semanticResumeProfile = await createSemanticResumeProfile(extractedText);
+    } catch (error) {
+      console.error("Resume semantic profile creation failed; using per-job fallback scoring.", error);
+    }
 
-    const formattedMatches = matchedJobs.map((job: any) => {
-      // Use the universal ATS engine to score the job description against the resume
-      const atsResult = calculateAtsScore(extractedText, job.description || "");
+    const shortlist = matchedJobs
+      .sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0))
+      .slice(0, 12);
+
+    const formattedMatches = await Promise.all(shortlist.map(async (job: any) => {
+      const atsResult = semanticResumeProfile
+        ? await calculateSemanticAtsScoreFromProfile(semanticResumeProfile, job.description || "")
+        : await calculateSemanticAtsScore(extractedText, job.description || "");
 
       return {
         id: job.id,
@@ -152,10 +131,12 @@ export async function POST(request: Request) {
         work_arrangement: job.work_arrangement,
         type: job.employment_type, 
         apply_url: job.apply_url,
-        matchPercentage: atsResult.score, // GUARANTEED to match the ATS checker
+        matchPercentage: atsResult.score,
         tags: ["Skills matched", atsResult.score > 75 ? "ATS ready" : "AI summary"].filter(Boolean)
       };
-    }).sort((a, b) => b.matchPercentage - a.matchPercentage); // Sort by the final ATS score
+    }));
+
+    formattedMatches.sort((a, b) => b.matchPercentage - a.matchPercentage);
 
     return NextResponse.json({ success: true, matches: formattedMatches.slice(0, 10) });
 

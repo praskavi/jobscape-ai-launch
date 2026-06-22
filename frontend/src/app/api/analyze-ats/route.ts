@@ -5,43 +5,9 @@ import { handleCors } from "@/lib/cors";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { extractTextFromFile } from "@/lib/parsers/extractText";
 import { analyzeResumeMatch } from "@/lib/ai/atsAnalyzer"; 
+import { calculateSemanticAtsScore } from "@/lib/semanticAtsScoring";
 
 const jobDescriptionSchema = z.string().max(10000, "Job description must not exceed 10,000 characters");
-
-function calculateAtsScore(resumeText: string, jdText: string) {
-  const stopWords = new Set(['and', 'the', 'for', 'with', 'this', 'that', 'you', 'your', 'are', 'will', 'can', 'have', 'from', 'but', 'not', 'what', 'all', 'were', 'when', 'how', 'any', 'about', 'more', 'our', 'out', 'has', 'must', 'only', 'also', 'such', 'some', 'they', 'their', 'which', 'who', 'whom', 'whose', 'why', 'would', 'should', 'could', 'was', 'been', 'being', 'does', 'doing', 'did', 'done', 'experience', 'years', 'team', 'work', 'required', 'preferred', 'skills', 'strong', 'ability', 'working', 'environment', 'include', 'duties', 'role', 'responsibilities', 'knowledge', 'including', 'support', 'management', 'development', 'business', 'ensure', 'provide', 'using', 'design', 'new', 'within', 'looking', 'about', 'this', 'role']);
-
-  const cleanText = (text: string) => (text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
-
-  const getKeywords = (text: string) => {
-    const words = cleanText(text).split(/\s+/);
-    const wordCounts = new Map<string, number>();
-    
-    for (const w of words) {
-      if (w.length > 3 && !stopWords.has(w) && isNaN(Number(w))) {
-        wordCounts.set(w, (wordCounts.get(w) || 0) + 1);
-      }
-    }
-    
-    return Array.from(wordCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(entry => entry[0]);
-  };
-
-  const jdKeywords = getKeywords(jdText).slice(0, 20);
-  const resumeCleaned = ` ${cleanText(resumeText)} `;
-
-  const matchedKeywords = jdKeywords.filter(kw => resumeCleaned.includes(` ${kw} `));
-  const missingKeywords = jdKeywords.filter(kw => !resumeCleaned.includes(` ${kw} `));
-
-  let score = 0;
-  if (jdKeywords.length > 0) {
-    const targetCount = Math.min(jdKeywords.length, 15);
-    score = Math.min(100, Math.round((matchedKeywords.length / targetCount) * 100));
-  }
-
-  return { score, matchedKeywords, missingKeywords };
-}
 
 export async function POST(request: Request) {
   const corsResponse = handleCors(request);
@@ -111,7 +77,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { score, matchedKeywords, missingKeywords } = calculateAtsScore(extractedText, jdResult.data);
+    const { score, matchedKeywords, missingKeywords } = await calculateSemanticAtsScore(extractedText, jdResult.data);
     
     let aiRecommendations = null;
     
