@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   const auth = await verifyApiUser(request);
   if (auth.response) return auth.response;
 
-  const entitlement = await requireFeatureAccess(request, auth.user!.id, "ai_job_match");
+  const entitlement = await requireFeatureAccess(request, auth.user!.id, "ai_job_match", auth.user!.email);
   if (entitlement.response) return entitlement.response;
   const resultLimit = entitlement.entitlement?.plan_code === "premium" ? 20 : 10;
 
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
 
     formattedMatches.sort((a, b) => b.matchPercentage - a.matchPercentage);
 
-    await recordFeatureUsage(request, auth.user!.id, "ai_job_match");
+    await recordFeatureUsage(request, auth.user!.id, "ai_job_match", auth.user!.email);
 
     return NextResponse.json({ success: true, matches: formattedMatches.slice(0, resultLimit) });
 

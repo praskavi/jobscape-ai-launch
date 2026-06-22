@@ -12,6 +12,12 @@ type EntitlementResult = {
   remaining?: number | null;
 };
 
+const ADMIN_EMAILS = new Set(["dittprashant@gmail.com"]);
+
+export function isSubscriptionAdmin(email?: string | null) {
+  return email ? ADMIN_EMAILS.has(email.toLowerCase()) : false;
+}
+
 async function getEntitlementClient(request: Request) {
   const authHeader = request.headers.get("Authorization");
 
@@ -36,7 +42,23 @@ export async function requireFeatureAccess(
   request: Request,
   userId: string,
   featureCode: string,
+  userEmail?: string | null,
 ) {
+  if (isSubscriptionAdmin(userEmail)) {
+    return {
+      response: null,
+      entitlement: {
+        allowed: true,
+        reason: "admin_bypass",
+        plan_code: "admin",
+        feature_code: featureCode,
+        usage_limit: null,
+        usage_count: null,
+        remaining: null,
+      } satisfies EntitlementResult,
+    };
+  }
+
   const supabase = await getEntitlementClient(request);
   const { data, error } = await supabase.rpc("can_use_feature", {
     p_user_id: userId,
@@ -81,7 +103,20 @@ export async function recordFeatureUsage(
   request: Request,
   userId: string,
   featureCode: string,
+  userEmail?: string | null,
 ) {
+  if (isSubscriptionAdmin(userEmail)) {
+    return {
+      allowed: true,
+      reason: "admin_bypass",
+      plan_code: "admin",
+      feature_code: featureCode,
+      usage_limit: null,
+      usage_count: null,
+      remaining: null,
+    } satisfies EntitlementResult;
+  }
+
   const supabase = await getEntitlementClient(request);
   const { data, error } = await supabase.rpc("increment_usage", {
     p_user_id: userId,

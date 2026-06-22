@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const auth = await verifyApiUser(request);
   if (auth.response) return auth.response;
 
-  const entitlement = await requireFeatureAccess(request, auth.user!.id, "resume_generate");
+  const entitlement = await requireFeatureAccess(request, auth.user!.id, "resume_generate", auth.user!.email);
   if (entitlement.response) return entitlement.response;
 
   let formData: FormData;
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     const enhancement = await generateResumeEnhancement(resumeText, jdResult.data);
-    await recordFeatureUsage(request, auth.user!.id, "resume_generate");
+    await recordFeatureUsage(request, auth.user!.id, "resume_generate", auth.user!.email);
 
     return NextResponse.json({ success: true, enhancement });
   } catch (err: any) {

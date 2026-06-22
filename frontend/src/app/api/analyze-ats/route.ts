@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     return auth.response;
   }
 
-  const entitlement = await requireFeatureAccess(request, auth.user!.id, "ats_score");
+  const entitlement = await requireFeatureAccess(request, auth.user!.id, "ats_score", auth.user!.email);
   if (entitlement.response) {
     if (corsResponse.response) {
       corsResponse.response.headers.forEach((val, key) => entitlement.response!.headers.set(key, val));
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
       }
     });
 
-    await recordFeatureUsage(request, auth.user!.id, "ats_score");
+    await recordFeatureUsage(request, auth.user!.id, "ats_score", auth.user!.email);
 
     if (corsResponse.response) {
       corsResponse.response.headers.forEach((val, key) => finalResponse.headers.set(key, val));

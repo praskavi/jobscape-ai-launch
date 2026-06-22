@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   const auth = await verifyApiUser(request);
   if (auth.response) return auth.response;
 
-  const entitlement = await requireFeatureAccess(request, auth.user!.id, "cover_letter_generate");
+  const entitlement = await requireFeatureAccess(request, auth.user!.id, "cover_letter_generate", auth.user!.email);
   if (entitlement.response) return entitlement.response;
 
   let formData: FormData;
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       parsedInput.data.companyName,
       parsedInput.data.roleTitle,
     );
-    await recordFeatureUsage(request, auth.user!.id, "cover_letter_generate");
+    await recordFeatureUsage(request, auth.user!.id, "cover_letter_generate", auth.user!.email);
 
     return NextResponse.json({ success: true, coverLetter });
   } catch (err: any) {
