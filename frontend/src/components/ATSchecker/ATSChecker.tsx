@@ -26,6 +26,24 @@ interface AnalysisResult {
   } | null;
 }
 
+async function getApiErrorMessage(response: Response, fallback: string) {
+  const errorData = await response.json().catch(() => null);
+
+  if (response.status === 402) {
+    if (errorData?.reason === "usage_limit_reached") {
+      return "Your monthly allowance for this feature has been used. Upgrade your plan or try again next month.";
+    }
+
+    if (errorData?.reason === "feature_not_enabled") {
+      return "This feature is not included in your current plan.";
+    }
+
+    return errorData?.error || "This feature is not available on your current subscription.";
+  }
+
+  return errorData?.message || errorData?.error || fallback;
+}
+
 export function ATSChecker() {
   const [resumeFile, setResumeFile] = React.useState<File | null>(null);
   const [jobDescription, setJobDescription] = React.useState("");
@@ -109,7 +127,9 @@ export function ATSChecker() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Failed to analyze the resume. Please try again.");
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, "Failed to analyze the resume. Please try again."));
+      }
 
       const data = await response.json();
       setSuccess(true);
@@ -144,7 +164,9 @@ export function ATSChecker() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Failed to generate AI recommendations.");
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, "Failed to generate AI recommendations."));
+      }
 
       const data = await response.json();
       

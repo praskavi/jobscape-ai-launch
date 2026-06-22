@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileStack, Search, Settings as SettingsIcon, FileSearch, Target } from "lucide-react";
+import { CreditCard, FileSearch, FileStack, LayoutDashboard, Search, Settings as SettingsIcon, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -11,6 +11,7 @@ const NAV = [
   { label: "Resume & Cover Letter", href: "/documents", icon: FileStack },
   { label: "Job Searches", href: "/jobsearch", icon: Search },
   { label: "Settings", href: "/settings", icon: SettingsIcon },
+  { label: "Subscription", href: "/subscription", icon: CreditCard },
   { label: "ATS Checker", href: "/atschecker", icon: FileSearch },
   { label: "AI Job Match", href: "/aijobmatch", icon: Target }
 ];

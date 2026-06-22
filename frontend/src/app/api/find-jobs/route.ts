@@ -9,6 +9,7 @@ import {
   createSemanticResumeProfile,
   type SemanticResumeProfile,
 } from "@/lib/semanticAtsScoring";
+import { recordFeatureUsage, requireFeatureAccess } from "@/lib/subscriptionEntitlements";
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseAdmin = createClient(
@@ -25,6 +26,9 @@ export async function POST(request: Request) {
 
   const auth = await verifyApiUser(request);
   if (auth.response) return auth.response;
+
+  const entitlement = await requireFeatureAccess(request, auth.user!.id, "ai_job_match");
+  if (entitlement.response) return entitlement.response;
 
   let formData: FormData;
   try {
@@ -137,6 +141,8 @@ export async function POST(request: Request) {
     }));
 
     formattedMatches.sort((a, b) => b.matchPercentage - a.matchPercentage);
+
+    await recordFeatureUsage(request, auth.user!.id, "ai_job_match");
 
     return NextResponse.json({ success: true, matches: formattedMatches.slice(0, 10) });
 

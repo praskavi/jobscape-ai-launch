@@ -6,6 +6,7 @@ import { checkRateLimit } from "@/lib/rateLimit";
 import { extractTextFromFile } from "@/lib/parsers/extractText";
 import { analyzeResumeMatch } from "@/lib/ai/atsAnalyzer"; 
 import { calculateSemanticAtsScore } from "@/lib/semanticAtsScoring";
+import { recordFeatureUsage, requireFeatureAccess } from "@/lib/subscriptionEntitlements";
 
 const jobDescriptionSchema = z.string().max(10000, "Job description must not exceed 10,000 characters");
 
@@ -27,6 +28,14 @@ export async function POST(request: Request) {
       corsResponse.response.headers.forEach((val, key) => auth.response!.headers.set(key, val));
     }
     return auth.response;
+  }
+
+  const entitlement = await requireFeatureAccess(request, auth.user!.id, "ats_score");
+  if (entitlement.response) {
+    if (corsResponse.response) {
+      corsResponse.response.headers.forEach((val, key) => entitlement.response!.headers.set(key, val));
+    }
+    return entitlement.response;
   }
 
   let formData: FormData;
@@ -96,6 +105,8 @@ export async function POST(request: Request) {
         aiRecommendations 
       }
     });
+
+    await recordFeatureUsage(request, auth.user!.id, "ats_score");
 
     if (corsResponse.response) {
       corsResponse.response.headers.forEach((val, key) => finalResponse.headers.set(key, val));

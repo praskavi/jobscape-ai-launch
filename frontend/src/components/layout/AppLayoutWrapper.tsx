@@ -42,6 +42,7 @@ export function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/jobsearch') ||
     pathname.startsWith('/documents') ||
     pathname.startsWith('/settings') ||
+    pathname.startsWith('/subscription') ||
     pathname.startsWith('/aijobmatch');
 
   // We conditionally render the sidebar if user is logged in AND they are on a dashboard/app path

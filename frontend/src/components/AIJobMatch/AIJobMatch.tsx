@@ -21,6 +21,24 @@ interface JobMatch {
   description?: string; // Added to hold the job description for the modal
 }
 
+async function getApiErrorMessage(response: Response, fallback: string) {
+  const errorData = await response.json().catch(() => null);
+
+  if (response.status === 402) {
+    if (errorData?.reason === "usage_limit_reached") {
+      return "Your monthly AI job match allowance has been used. Upgrade your plan or try again next month.";
+    }
+
+    if (errorData?.reason === "feature_not_enabled") {
+      return "AI Job Match is not included in your current plan.";
+    }
+
+    return errorData?.error || "AI Job Match is not available on your current subscription.";
+  }
+
+  return errorData?.message || errorData?.error || fallback;
+}
+
 export function AIJobMatch() {
   const router = useRouter();
 
@@ -107,8 +125,7 @@ export function AIJobMatch() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || "Failed to find matches.");
+        throw new Error(await getApiErrorMessage(response, "Failed to find matches."));
       }
 
       const data = await response.json();

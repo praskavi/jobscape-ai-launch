@@ -26,15 +26,15 @@ export const steps = [
 export const tiers = [
   {
     name: "Free", price: "$0", blurb: "For getting started", cta: "Start Free", highlight: false,
-    features: ["Upload 1 resume", "5 job searches / month", "Rule-based scoring", "Basic dashboard"]
+    features: ["Unlimited job search", "1 active resume", "3 ATS checks / month", "Basic dashboard"]
   },
   {
-    name: "Pro", price: "$19", blurb: "For active job seekers", cta: "Start Pro", highlight: true,
-    features: ["Unlimited job searches", "Resume + cover letter upload", "AI ATS scoring credits", "Match explanations", "Search history"]
+    name: "Basic", price: "$19", blurb: "For active job seekers", cta: "Start Basic", highlight: true,
+    features: ["Unlimited job search", "1 active resume", "10 ATS checks / month", "20 AI job matches / month", "10 resume enhancements / month", "10 cover letters / month", "Top 10 premium recommendations"]
   },
   {
-    name: "Business", price: "$49", blurb: "For coaches & teams", cta: "Contact Us", highlight: false,
-    features: ["Multiple client profiles", "Bulk resume matching", "Export reports", "Priority support"]
+    name: "Premium", price: "$49", blurb: "For power users", cta: "Start Premium", highlight: false,
+    features: ["Unlimited job search", "3 active resumes", "60 ATS checks / month", "50 AI job matches / month", "30 resume enhancements / month", "20 cover letters / month", "Top 20 premium recommendations"]
   },
 ];
 
