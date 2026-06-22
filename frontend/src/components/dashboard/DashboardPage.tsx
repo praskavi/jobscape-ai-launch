@@ -4,6 +4,7 @@ import { Search, History, CheckCircle2, AlertCircle, X } from "lucide-react";
 
 import { StatCard } from "../ui/StatCard";
 import { DocumentSection } from "./DocumentSection";
+import { DocumentGenerators } from "./DocumentGenerators";
 import { RecentSearches } from "./RecentSearches";
 import { ConfirmDeleteModal } from "../ui/ConfirmDeleteModal";
 import type { UserDocument } from "../../controllers/useDocuments";
@@ -218,6 +219,8 @@ export function DashboardPage({
               onRequestDelete={() => setPendingDelete("cover_letter")}
             />
           </div>
+
+          <DocumentGenerators />
 
           {/* Recent searches */}
           <RecentSearches searches={searches} />
