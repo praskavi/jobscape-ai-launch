@@ -29,6 +29,7 @@ export async function POST(request: Request) {
 
   const entitlement = await requireFeatureAccess(request, auth.user!.id, "ai_job_match");
   if (entitlement.response) return entitlement.response;
+  const resultLimit = entitlement.entitlement?.plan_code === "premium" ? 20 : 10;
 
   let formData: FormData;
   try {
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
 
     const shortlist = matchedJobs
       .sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0))
-      .slice(0, 12);
+      .slice(0, Math.max(resultLimit + 2, 12));
 
     const formattedMatches = await Promise.all(shortlist.map(async (job: any) => {
       const atsResult = semanticResumeProfile
@@ -144,7 +145,7 @@ export async function POST(request: Request) {
 
     await recordFeatureUsage(request, auth.user!.id, "ai_job_match");
 
-    return NextResponse.json({ success: true, matches: formattedMatches.slice(0, 10) });
+    return NextResponse.json({ success: true, matches: formattedMatches.slice(0, resultLimit) });
 
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "An error occurred during analysis." }, { status: 500 });

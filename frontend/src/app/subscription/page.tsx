@@ -57,6 +57,7 @@ const plans = [
 type SubscriptionFeature = {
   feature_code: string;
   feature_name: string;
+  feature_type?: string;
   is_enabled: boolean;
   usage_limit: number | null;
   usage_count: number | null;
@@ -83,16 +84,30 @@ const fallbackSummary: SubscriptionSummary = {
     { feature_code: "job_search", feature_name: "Job searches", is_enabled: true, usage_limit: null, usage_count: null, remaining: null },
     { feature_code: "ats_score", feature_name: "ATS checks", is_enabled: true, usage_limit: 3, usage_count: 0, remaining: 3 },
     { feature_code: "ai_job_match", feature_name: "AI job matches", is_enabled: false, usage_limit: 0, usage_count: 0, remaining: 0 },
+    { feature_code: "resume_generate", feature_name: "Resume enhancements", is_enabled: false, usage_limit: 0, usage_count: 0, remaining: 0 },
+    { feature_code: "cover_letter_generate", feature_name: "Cover letters", is_enabled: false, usage_limit: 0, usage_count: 0, remaining: 0 },
+    { feature_code: "premium_recommendations", feature_name: "Premium recommendations", feature_type: "boolean", is_enabled: false, usage_limit: 0, usage_count: null, remaining: null },
   ],
 };
 
-const usageFeatureOrder = ["resume_upload", "job_search", "ats_score", "ai_job_match"];
+const usageFeatureOrder = [
+  "resume_upload",
+  "job_search",
+  "ats_score",
+  "ai_job_match",
+  "resume_generate",
+  "cover_letter_generate",
+  "premium_recommendations",
+];
 
 const featureLabels: Record<string, string> = {
   resume_upload: "Resume uploads",
   job_search: "Job searches",
   ats_score: "ATS checks",
   ai_job_match: "AI job matches",
+  resume_generate: "Resume enhancements",
+  cover_letter_generate: "Cover letters",
+  premium_recommendations: "Premium recommendations",
 };
 
 export default async function SubscriptionPage() {
@@ -119,6 +134,7 @@ export default async function SubscriptionPage() {
       limit: feature.usage_limit,
       remaining: feature.remaining,
       enabled: feature.is_enabled,
+      isBoolean: feature.feature_type === "boolean",
     };
   });
 
@@ -153,11 +169,18 @@ export default async function SubscriptionPage() {
         </div>
       </div>
 
-      <section className="grid gap-4 lg:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {usageRows.map((row) => {
           const numericLimit = typeof row.limit === "number" ? row.limit : null;
-          const percentage = numericLimit && numericLimit > 0 ? Math.min((row.used / numericLimit) * 100, 100) : 0;
-          const limitLabel = numericLimit === null ? "Unlimited" : numericLimit;
+          const percentage = !row.isBoolean && numericLimit && numericLimit > 0
+            ? Math.min((row.used / numericLimit) * 100, 100)
+            : 0;
+          const primaryValue = row.isBoolean
+            ? row.enabled && numericLimit ? `Top ${numericLimit}` : "Locked"
+            : row.used;
+          const limitLabel = row.isBoolean
+            ? "included"
+            : numericLimit === null ? "Unlimited" : numericLimit;
 
           return (
             <div key={row.label} className="rounded-lg border border-border bg-surface p-4">
@@ -166,10 +189,10 @@ export default async function SubscriptionPage() {
                 <Gauge className="h-4 w-4 text-muted-foreground" />
               </div>
               <p className="mt-3 text-2xl font-semibold text-foreground">
-                {row.used}
+                {primaryValue}
                 <span className="text-sm font-medium text-muted-foreground">
                   {" "}
-                  / {limitLabel}
+                  {row.isBoolean ? limitLabel : `/ ${limitLabel}`}
                 </span>
               </p>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
@@ -181,6 +204,8 @@ export default async function SubscriptionPage() {
               <p className="mt-2 text-xs text-muted-foreground">
                 {!row.enabled
                   ? "Not included in this plan"
+                  : row.isBoolean
+                    ? "Included with this plan"
                   : row.remaining === null
                     ? "Unlimited this month"
                     : `${row.remaining} remaining this month`}
