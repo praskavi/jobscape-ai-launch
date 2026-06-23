@@ -6,10 +6,12 @@ import { StatCard } from "../ui/StatCard";
 import { DocumentSection } from "./DocumentSection";
 import { DocumentGenerators } from "./DocumentGenerators";
 import { RecentSearches } from "./RecentSearches";
+import { PlanUsageSummary } from "@/components/subscription/PlanUsageSummary";
 import { ConfirmDeleteModal } from "../ui/ConfirmDeleteModal";
 import type { UserDocument } from "../../controllers/useDocuments";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/controllers/suabaseClient";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 // Removed the MOCK_USER and MOCK_SEARCHES imports!
 
@@ -27,9 +29,15 @@ export function DashboardPage({
   initialSearches,
 }: DashboardPageProps) {
   const router = useRouter();
+  const { refresh: refreshSubscription } = useSubscription();
   // Added 'id' and 'profileId' to the user state so we can query the database and storage safely
   const [user, setUser] = React.useState<{ id: string; full_name: string; email: string; profileId: string } | null>(initialUser);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [uploadingType, setUploadingType] = React.useState<"resume" | "cover_letter" | null>(null);
+  const [uploadErrors, setUploadErrors] = React.useState<Record<"resume" | "cover_letter", string | null>>({
+    resume: null,
+    cover_letter: null,
+  });
 
   const [resume, setResume] = React.useState<UserDocument | null>(initialResume);
   const [coverLetter, setCoverLetter] = React.useState<UserDocument | null>(initialCoverLetter);
@@ -38,12 +46,73 @@ export function DashboardPage({
   const [pendingDelete, setPendingDelete] = React.useState<"resume" | "cover_letter" | null>(null);
   const [mobileNav, setMobileNav] = React.useState(false);
 
+  const getApiErrorMessage = async (response: Response, fallback: string) => {
+    const errorData = await response.json().catch(() => null);
+
+    if (response.status === 402) {
+      if (errorData?.reason === "usage_limit_reached") {
+        return "Your monthly resume upload allowance has been used. Upgrade your plan or try again next month.";
+      }
+
+      if (errorData?.reason === "feature_not_enabled") {
+        return "Resume uploads are not included in your current plan.";
+      }
+
+      return errorData?.error || "Resume upload is not available on your current subscription.";
+    }
+
+    return errorData?.message || errorData?.error || fallback;
+  };
+
   const handleUpload = async (type: "resume" | "cover_letter", file: File) => {
     if (!user || !user.profileId) return;
 
     const STORAGE_BUCKET = "user-documents"; // correct bucket name (was: "documents")
 
+    setUploadingType(type);
+    setUploadErrors((current) => ({ ...current, [type]: null }));
+
     try {
+      if (type === "resume") {
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {};
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+
+        const formData = new FormData();
+        formData.append("resume", file);
+
+        const response = await fetch("/api/upload-resume", {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(await getApiErrorMessage(response, "Failed to upload resume."));
+        }
+
+        const data = await response.json();
+        const uploadedFile = data.file;
+
+        if (!uploadedFile) {
+          throw new Error("Resume uploaded, but the server did not return file metadata.");
+        }
+
+        setResume({
+          id: uploadedFile.id,
+          file_type: "resume",
+          file_name: uploadedFile.file_name,
+          file_path: uploadedFile.file_path,
+          file_url: uploadedFile.file_url || "",
+          mime_type: uploadedFile.mime_type,
+          file_size_bytes: uploadedFile.file_size_bytes,
+          created_at: uploadedFile.created_at || new Date().toISOString(),
+        });
+
+        await refreshSubscription();
+        return;
+      }
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${type}_${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`; // store under auth UID folder
@@ -98,12 +167,16 @@ export function DashboardPage({
         created_at: upsertData?.created_at || new Date().toISOString(),
       };
 
-      if (type === "resume") setResume(newDoc);
-      else setCoverLetter(newDoc);
+      setCoverLetter(newDoc);
 
     } catch (error: any) {
       console.error("Upload Error:", error.message);
-      alert("Failed to upload document: " + error.message);
+      setUploadErrors((current) => ({
+        ...current,
+        [type]: error.message || "Failed to upload document.",
+      }));
+    } finally {
+      setUploadingType(null);
     }
   };
 
@@ -202,12 +275,16 @@ export function DashboardPage({
             />
           </section>
 
+          <PlanUsageSummary />
+
           {/* Documents */}
           <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <DocumentSection
               title="Resume"
               type="resume"
               doc={resume}
+              isUploading={uploadingType === "resume"}
+              uploadError={uploadErrors.resume}
               onUpload={(f) => handleUpload("resume", f)}
               onRequestDelete={() => setPendingDelete("resume")}
             />
@@ -215,6 +292,8 @@ export function DashboardPage({
               title="Cover Letter"
               type="cover_letter"
               doc={coverLetter}
+              isUploading={uploadingType === "cover_letter"}
+              uploadError={uploadErrors.cover_letter}
               onUpload={(f) => handleUpload("cover_letter", f)}
               onRequestDelete={() => setPendingDelete("cover_letter")}
             />

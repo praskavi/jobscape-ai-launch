@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 
-const ALLOWED_ORIGINS = [
+const DEFAULT_ALLOWED_ORIGINS = [
   "https://jobscapeai.com",
   "https://jobscrape-ai-j8fxn.ondigitalocean.app",
   "http://localhost:3000",
 ];
 const LOCAL_DEVELOPMENT_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+function getAllowedOrigins() {
+  const configuredOrigins = process.env.CORS_ALLOWED_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return configuredOrigins?.length ? configuredOrigins : DEFAULT_ALLOWED_ORIGINS;
+}
 
 function isAllowedOrigin(origin: string) {
   try {
@@ -17,7 +25,7 @@ function isAllowedOrigin(origin: string) {
       return true;
     }
 
-    return ALLOWED_ORIGINS.includes(origin);
+    return getAllowedOrigins().includes(origin);
   } catch {
     return false;
   }

@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/controllers/suabaseClient";
 import { useRouter } from "next/navigation";
+import { UsageCounter } from "@/components/subscription/UsageCounter";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 interface JobMatch {
   id: string;
@@ -58,6 +60,7 @@ function buildFallbackSummary(score: number) {
 
 export function AIJobMatch() {
   const router = useRouter();
+  const { refresh: refreshSubscription } = useSubscription();
 
   const [jobTitle, setJobTitle] = React.useState("");
   const [location, setLocation] = React.useState("");
@@ -161,6 +164,7 @@ export function AIJobMatch() {
       setSavedResume(data.savedResume || savedResume);
       setHasSearched(true);
       setCachedResultDate(new Date().toISOString());
+      await refreshSubscription();
     } catch (err: any) {
       setError(err.message);
       setHasSearched(false);
@@ -180,6 +184,7 @@ export function AIJobMatch() {
   return (
     <div className="mx-auto w-full max-w-3xl py-6 px-4">
       <div className="flex flex-col gap-6">
+        <UsageCounter featureCode="ai_job_match" label="AI job matches" />
         
         {/* Search Inputs */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

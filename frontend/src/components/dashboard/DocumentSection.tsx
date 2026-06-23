@@ -9,6 +9,7 @@ interface DocumentSectionProps {
   type: "resume" | "cover_letter";
   doc: UserDocument | null;
   isUploading?: boolean;
+  uploadError?: string | null;
   onUpload: (file: File) => void;
   onRequestDelete: () => void;
 }
@@ -18,6 +19,7 @@ export function DocumentSection({
   type,
   doc,
   isUploading,
+  uploadError,
   onUpload,
   onRequestDelete,
 }: DocumentSectionProps) {
@@ -48,7 +50,7 @@ export function DocumentSection({
         <UploadBox
           label={`Upload your ${type === "resume" ? "resume" : "cover letter"}`}
           onFile={handleFile}
-          error={error}
+          error={error || uploadError}
           isLoading={isUploading} 
         />
       )}

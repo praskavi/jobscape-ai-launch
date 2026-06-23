@@ -1,5 +1,7 @@
 # Documents and generated assets
 *.md
+!docs/
+!docs/solution-design-*.md
 *.doc
 *.docx
 *.sql

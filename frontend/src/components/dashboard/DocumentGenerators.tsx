@@ -3,6 +3,8 @@
 import * as React from "react";
 import { AlertCircle, CheckCircle2, Copy, FileText, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/controllers/suabaseClient";
+import { UsageCounter } from "@/components/subscription/UsageCounter";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 type EnhancementResult = {
   summary?: string;
@@ -65,6 +67,7 @@ function resultToText(
 }
 
 export function DocumentGenerators() {
+  const { refresh: refreshSubscription } = useSubscription();
   const [mode, setMode] = React.useState<"resume" | "cover">("resume");
   const [resumeFile, setResumeFile] = React.useState<File | null>(null);
   const [jobDescription, setJobDescription] = React.useState("");
@@ -151,6 +154,7 @@ export function DocumentGenerators() {
         setCoverLetter(data.coverLetter || null);
         setSuccess("Cover letter generated.");
       }
+      await refreshSubscription();
     } catch (err: any) {
       setError(err.message || "Generation failed.");
     } finally {
@@ -171,6 +175,10 @@ export function DocumentGenerators() {
         <div>
           <h3 className="text-sm font-semibold text-foreground">AI document tools</h3>
           <p className="mt-1 text-sm text-muted-foreground">Generate resume improvements and cover letters.</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <UsageCounter featureCode="resume_generate" label="Resume enhancements" compact />
+          <UsageCounter featureCode="cover_letter_generate" label="Cover letters" compact />
         </div>
         <div className="inline-flex rounded-lg border border-border bg-background p-1">
           <button

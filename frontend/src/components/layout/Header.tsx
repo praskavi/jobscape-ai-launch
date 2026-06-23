@@ -29,7 +29,9 @@ export function Header({ onMenuToggle }: { onMenuToggle?: () => void }) {
     pathname.startsWith('/atschecker') ||
     pathname.startsWith('/jobsearch') ||
     pathname.startsWith('/documents') ||
-    pathname.startsWith('/settings');
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/subscription') ||
+    pathname.startsWith('/aijobmatch');
 
   const getInitials = (name: string) => {
     if (!name) return "U";

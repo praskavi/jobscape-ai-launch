@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/controllers/suabaseClient"; 
 import { useSearchParams } from "next/navigation";
+import { UsageCounter } from "@/components/subscription/UsageCounter";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 interface AnalysisResult {
   score: number;
@@ -45,6 +47,7 @@ async function getApiErrorMessage(response: Response, fallback: string) {
 }
 
 export function ATSChecker() {
+  const { refresh: refreshSubscription } = useSubscription();
   const [resumeFile, setResumeFile] = React.useState<File | null>(null);
   const [jobDescription, setJobDescription] = React.useState("");
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
@@ -134,6 +137,7 @@ export function ATSChecker() {
       const data = await response.json();
       setSuccess(true);
       setResult(data.analysis); 
+      await refreshSubscription();
 
     } catch (err: any) {
       setError(err.message);
@@ -172,6 +176,7 @@ export function ATSChecker() {
       
       // Update the existing result object with just the AI recommendations
       setResult(prev => prev ? { ...prev, aiRecommendations: data.analysis.aiRecommendations } : null);
+      await refreshSubscription();
 
     } catch (err: any) {
       setAiError(err.message);
@@ -193,6 +198,7 @@ export function ATSChecker() {
         <h1 className="text-2xl font-bold tracking-tight text-foreground">ATS Resume Checker</h1>
         <p className="mt-1 text-sm text-muted-foreground">Upload your resume and paste a job description to see how well you match.</p>
       </div>
+      <UsageCounter featureCode="ats_score" label="ATS checks" className="max-w-sm" />
 
       <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-2">
         <div className="flex flex-col gap-2">
