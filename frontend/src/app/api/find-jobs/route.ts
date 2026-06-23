@@ -11,11 +11,76 @@ import {
 } from "@/lib/semanticAtsScoring";
 import { recordFeatureUsage, requireFeatureAccess } from "@/lib/subscriptionEntitlements";
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from "node:crypto";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! // Ensure you use the Service Role Key here
-);
+function getBearerToken(request: Request) {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  return authHeader.slice("Bearer ".length);
+}
+
+function createRouteSupabaseClient(request: Request) {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+  const bearerToken = getBearerToken(request);
+
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    bearerToken && !serviceRoleKey
+      ? {
+          global: {
+            headers: {
+              Authorization: `Bearer ${bearerToken}`,
+            },
+          },
+        }
+      : undefined
+  );
+}
+
+function buildMatchSummary(score: number) {
+  if (score >= 80) return "Strong resume fit based on ATS keyword and semantic matching.";
+  if (score >= 60) return "Good resume fit with a few areas to tailor before applying.";
+  if (score >= 40) return "Partial resume fit; review missing requirements before applying.";
+  return "Low resume fit; significant tailoring may be needed for this role.";
+}
+
+async function getUserProfileId(supabaseClient: ReturnType<typeof createRouteSupabaseClient>, authUserId: string) {
+  const { data } = await supabaseClient
+    .from("user_profiles")
+    .select("id")
+    .eq("user_id", authUserId)
+    .maybeSingle<{ id: string }>();
+
+  return data?.id || null;
+}
+
+export async function GET(request: Request) {
+  const corsResponse = handleCors(request);
+  if (corsResponse.response && !corsResponse.isAllowed) return corsResponse.response;
+
+  const auth = await verifyApiUser(request);
+  if (auth.response) return auth.response;
+
+  const supabase = createRouteSupabaseClient(request);
+  const { data, error } = await supabase
+    .from("ai_job_match_runs")
+    .select("id, job_title, location, result_count, matches, scoring_version, created_at")
+    .eq("user_id", auth.user!.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to load cached AI job matches." }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    cached: Boolean(data),
+    latest: data || null,
+  });
+}
 
 export async function POST(request: Request) {
   const corsResponse = handleCors(request);
@@ -78,6 +143,7 @@ export async function POST(request: Request) {
 
     const vectorEmbedding = await hfResponse.json();
     if (!Array.isArray(vectorEmbedding) || !Array.isArray(vectorEmbedding[0])) throw new Error("Unexpected vector format received from AI model.");
+    const supabaseAdmin = createRouteSupabaseClient(request);
 
     // parallel chunk searching
     const searchPromises = vectorEmbedding.map((chunkVector: number[]) => 
@@ -137,15 +203,36 @@ export async function POST(request: Request) {
         type: job.employment_type, 
         apply_url: job.apply_url,
         matchPercentage: atsResult.score,
+        matchedKeywords: atsResult.matchedKeywords,
+        missingKeywords: atsResult.missingKeywords,
+        aiSummary: buildMatchSummary(atsResult.score),
         tags: ["Skills matched", atsResult.score > 75 ? "ATS ready" : "AI summary"].filter(Boolean)
       };
     }));
 
     formattedMatches.sort((a, b) => b.matchPercentage - a.matchPercentage);
+    const slicedMatches = formattedMatches.slice(0, resultLimit);
+    const userProfileId = await getUserProfileId(supabaseAdmin, auth.user!.id);
+    const resumeHash = createHash("sha256").update(extractedText).digest("hex");
+
+    const { error: cacheError } = await supabaseAdmin.from("ai_job_match_runs").insert({
+      user_id: auth.user!.id,
+      user_profile_id: userProfileId,
+      resume_hash: resumeHash,
+      job_title: jobTitle,
+      location,
+      result_count: slicedMatches.length,
+      matches: slicedMatches,
+      scoring_version: "semantic-ats-v2",
+    });
+
+    if (cacheError) {
+      console.error("Failed to cache AI job match results.", cacheError);
+    }
 
     await recordFeatureUsage(request, auth.user!.id, "ai_job_match", auth.user!.email);
 
-    return NextResponse.json({ success: true, matches: formattedMatches.slice(0, resultLimit) });
+    return NextResponse.json({ success: true, matches: slicedMatches });
 
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "An error occurred during analysis." }, { status: 500 });

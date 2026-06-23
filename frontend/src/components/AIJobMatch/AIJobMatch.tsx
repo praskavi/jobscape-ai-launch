@@ -19,6 +19,9 @@ interface JobMatch {
   tags: string[];
   apply_url: string;
   description?: string; // Added to hold the job description for the modal
+  matchedKeywords?: string[];
+  missingKeywords?: string[];
+  aiSummary?: string;
 }
 
 async function getApiErrorMessage(response: Response, fallback: string) {
@@ -48,12 +51,60 @@ export function AIJobMatch() {
   const [isDragging, setIsDragging] = React.useState(false);
   
   const [isSearching, setIsSearching] = React.useState(false);
+  const [isLoadingCachedResults, setIsLoadingCachedResults] = React.useState(true);
   const [hasSearched, setHasSearched] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [results, setResults] = React.useState<JobMatch[]>([]);
+  const [cachedResultDate, setCachedResultDate] = React.useState<string | null>(null);
   
   // State for the Modal
   const [selectedJob, setSelectedJob] = React.useState<JobMatch | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const loadLatestCachedResults = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
+        if (!token) {
+          return;
+        }
+
+        const response = await fetch("/api/find-jobs", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        const cachedMatches = Array.isArray(data.latest?.matches) ? data.latest.matches : [];
+
+        if (isMounted && cachedMatches.length > 0) {
+          setResults(cachedMatches);
+          setHasSearched(true);
+          setJobTitle(data.latest?.job_title || "");
+          setLocation(data.latest?.location || "");
+          setCachedResultDate(data.latest?.created_at || null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingCachedResults(false);
+        }
+      }
+    };
+
+    loadLatestCachedResults();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -92,6 +143,8 @@ export function AIJobMatch() {
     setError(null);
     setResumeFile(file);
     setHasSearched(false);
+    setCachedResultDate(null);
+    setResults([]);
   };
 
   const handleSearch = async (e?: React.FormEvent) => {
@@ -131,6 +184,7 @@ export function AIJobMatch() {
       const data = await response.json();
       setResults(data.matches || []);
       setHasSearched(true);
+      setCachedResultDate(new Date().toISOString());
     } catch (err: any) {
       setError(err.message);
       setHasSearched(false);
@@ -158,7 +212,7 @@ export function AIJobMatch() {
             <input
               type="text"
               value={jobTitle}
-              onChange={(e) => { setJobTitle(e.target.value); setHasSearched(false); }}
+              onChange={(e) => { setJobTitle(e.target.value); setHasSearched(false); setCachedResultDate(null); setResults([]); }}
               placeholder="Target Role (e.g. Salesforce Developer)"
               className="w-full pl-11 pr-4 py-3.5 text-base rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none"
             />
@@ -168,7 +222,7 @@ export function AIJobMatch() {
             <input
               type="text"
               value={location}
-              onChange={(e) => { setLocation(e.target.value); setHasSearched(false); }}
+              onChange={(e) => { setLocation(e.target.value); setHasSearched(false); setCachedResultDate(null); setResults([]); }}
               placeholder="Location (e.g. Melbourne)"
               className="w-full pl-11 pr-4 py-3.5 text-base rounded-2xl border border-gray-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none"
             />
@@ -206,7 +260,7 @@ export function AIJobMatch() {
                   Selected
                 </span>
                 <button 
-                  onClick={() => { setResumeFile(null); setHasSearched(false); }}
+                  onClick={() => { setResumeFile(null); setHasSearched(false); setCachedResultDate(null); setResults([]); }}
                   className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"
                 >
                   <X className="h-4 w-4" />
@@ -240,7 +294,14 @@ export function AIJobMatch() {
           </div>
         )}
 
-        {!isSearching && !hasSearched && resumeFile && (
+        {isLoadingCachedResults && !isSearching && (
+          <div className="flex flex-col items-center justify-center py-12 space-y-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+            <p className="text-gray-600 font-medium">Loading your latest AI matches...</p>
+          </div>
+        )}
+
+        {!isLoadingCachedResults && !isSearching && !hasSearched && resumeFile && (
            <div className="flex flex-col items-center justify-center py-12 border border-dashed border-gray-200 rounded-2xl bg-gray-50/50 mt-4">
              <Briefcase className="h-10 w-10 text-gray-300 mb-3" />
              <h3 className="text-gray-500 font-medium text-sm">Ready to scan against active job listings</h3>
@@ -248,8 +309,13 @@ export function AIJobMatch() {
         )}
 
         {/* Results List */}
-        {!isSearching && hasSearched && (
+        {!isLoadingCachedResults && !isSearching && hasSearched && (
           <div className="space-y-4 mt-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {cachedResultDate && (
+              <p className="text-xs text-gray-500">
+                Showing saved AI match results from {new Date(cachedResultDate).toLocaleString()}.
+              </p>
+            )}
             {results.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-gray-200 shadow-sm">
                 <p className="text-gray-500 text-base">No highly matched jobs found. Try adjusting your search filters.</p>
@@ -299,6 +365,12 @@ export function AIJobMatch() {
                         </span>
                       ))}
                     </div>
+                  )}
+
+                  {job.aiSummary && (
+                    <p className="text-sm text-gray-600">
+                      {job.aiSummary}
+                    </p>
                   )}
                 </div>
               ))
