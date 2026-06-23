@@ -1,76 +1,85 @@
 "use client";
+// KAN-37: Premium users get a resume library (up to 3 stored resumes, 1 active).
+// Free/Basic users see a single resume card (new upload auto-replaces existing).
+
 import * as React from "react";
-import { Search, History, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { Search, History, CheckCircle2, AlertCircle } from "lucide-react";
 
 import { StatCard } from "../ui/StatCard";
 import { DocumentSection } from "./DocumentSection";
+import { ResumeLibrary } from "./ResumeLibrary";
 import { DocumentGenerators } from "./DocumentGenerators";
 import { RecentSearches } from "./RecentSearches";
 import { PlanUsageSummary } from "@/components/subscription/PlanUsageSummary";
 import { ConfirmDeleteModal } from "../ui/ConfirmDeleteModal";
 import type { UserDocument } from "../../controllers/useDocuments";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/controllers/suabaseClient";
 import { useSubscription } from "@/contexts/SubscriptionContext";
-
-// Removed the MOCK_USER and MOCK_SEARCHES imports!
 
 interface DashboardPageProps {
   initialUser: { id: string; full_name: string; email: string; profileId: string } | null;
   initialResume: UserDocument | null;
+  initialResumes?: UserDocument[];       // KAN-37: all stored resumes (premium library)
   initialCoverLetter: UserDocument | null;
   initialSearches: any[];
 }
 
+const STORAGE_BUCKET = "user-documents";
+
 export function DashboardPage({
   initialUser,
   initialResume,
+  initialResumes,
   initialCoverLetter,
   initialSearches,
 }: DashboardPageProps) {
-  const router = useRouter();
-  const { refresh: refreshSubscription } = useSubscription();
-  // Added 'id' and 'profileId' to the user state so we can query the database and storage safely
-  const [user, setUser] = React.useState<{ id: string; full_name: string; email: string; profileId: string } | null>(initialUser);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const { summary, refresh: refreshSubscription } = useSubscription();
+  const planCode = summary?.plan?.plan_code ?? "free";
+  const isPremium = planCode === "premium";
+
+  const [user] = React.useState(initialUser);
+  const [isLoading] = React.useState(false);
+
+  // ── Resume state ──────────────────────────────────────────────────
+  // Premium: array of all stored resumes (up to 3)
+  // Free/Basic: single resume or null
+  const [resumes, setResumes] = React.useState<UserDocument[]>(
+    isPremium
+      ? (initialResumes ?? (initialResume ? [initialResume] : []))
+      : (initialResume ? [initialResume] : []),
+  );
+  const activeResume = resumes.find((r) => r.is_current !== false) ?? resumes[0] ?? null;
+
+  const [coverLetter, setCoverLetter] = React.useState<UserDocument | null>(initialCoverLetter);
+  const [searches] = React.useState<any[]>(initialSearches);
+
   const [uploadingType, setUploadingType] = React.useState<"resume" | "cover_letter" | null>(null);
   const [uploadErrors, setUploadErrors] = React.useState<Record<"resume" | "cover_letter", string | null>>({
     resume: null,
     cover_letter: null,
   });
 
-  const [resume, setResume] = React.useState<UserDocument | null>(initialResume);
-  const [coverLetter, setCoverLetter] = React.useState<UserDocument | null>(initialCoverLetter);
-  const [searches, setSearches] = React.useState<any[]>(initialSearches);
+  // pendingDeleteDoc: the document the user wants to delete (any type)
+  const [pendingDeleteDoc, setPendingDeleteDoc] = React.useState<UserDocument | null>(null);
 
-  const [pendingDelete, setPendingDelete] = React.useState<"resume" | "cover_letter" | null>(null);
-  const [mobileNav, setMobileNav] = React.useState(false);
-
+  // ── Error message helper ──────────────────────────────────────────
   const getApiErrorMessage = async (response: Response, fallback: string) => {
-    const errorData = await response.json().catch(() => null);
-
+    const body = await response.json().catch(() => null);
     if (response.status === 402) {
-      if (errorData?.reason === "usage_limit_reached") {
-        return "Your monthly resume upload allowance has been used. Upgrade your plan or try again next month.";
-      }
-
-      if (errorData?.reason === "feature_not_enabled") {
-        return "Resume uploads are not included in your current plan.";
-      }
-
-      return errorData?.error || "Resume upload is not available on your current subscription.";
+      if (body?.reason === "storage_limit_reached") return body.message ?? "Resume library full.";
+      if (body?.reason === "usage_limit_reached") return "Monthly allowance reached. Upgrade or wait until next month.";
+      if (body?.reason === "feature_not_enabled") return "This feature is not available on your current plan.";
+      return body?.error ?? "Feature not available on your current plan.";
     }
-
-    return errorData?.message || errorData?.error || fallback;
+    return body?.message ?? body?.error ?? fallback;
   };
 
+  // ── Upload handler ────────────────────────────────────────────────
   const handleUpload = async (type: "resume" | "cover_letter", file: File) => {
-    if (!user || !user.profileId) return;
-
-    const STORAGE_BUCKET = "user-documents"; // correct bucket name (was: "documents")
+    if (!user?.profileId) return;
 
     setUploadingType(type);
-    setUploadErrors((current) => ({ ...current, [type]: null }));
+    setUploadErrors((cur) => ({ ...cur, [type]: null }));
 
     try {
       if (type === "resume") {
@@ -92,131 +101,137 @@ export function DashboardPage({
         }
 
         const data = await response.json();
-        const uploadedFile = data.file;
+        const uploaded = data.file as UserDocument & { file_url?: string };
 
-        if (!uploadedFile) {
-          throw new Error("Resume uploaded, but the server did not return file metadata.");
-        }
-
-        setResume({
-          id: uploadedFile.id,
+        const newDoc: UserDocument = {
+          id: uploaded.id,
           file_type: "resume",
-          file_name: uploadedFile.file_name,
-          file_path: uploadedFile.file_path,
-          file_url: uploadedFile.file_url || "",
-          mime_type: uploadedFile.mime_type,
-          file_size_bytes: uploadedFile.file_size_bytes,
-          created_at: uploadedFile.created_at || new Date().toISOString(),
-        });
+          file_name: uploaded.file_name,
+          file_path: uploaded.file_path,
+          file_url: uploaded.file_url ?? "",
+          mime_type: uploaded.mime_type,
+          file_size_bytes: uploaded.file_size_bytes,
+          created_at: uploaded.created_at ?? new Date().toISOString(),
+          is_current: true,
+        };
+
+        if (isPremium) {
+          // Add new resume to library; all others become inactive (API already did this in DB)
+          setResumes((prev) =>
+            [newDoc, ...prev.map((r) => ({ ...r, is_current: false }))].slice(0, 3),
+          );
+        } else {
+          // Free/Basic: replace the single resume
+          setResumes([newDoc]);
+        }
 
         await refreshSubscription();
         return;
       }
 
-      const fileExt = file.name.split('.').pop();
+      // ── Cover letter: direct Supabase client upload (not gated by subscription) ──
+      const fileExt = file.name.split(".").pop();
       const fileName = `${type}_${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`; // store under auth UID folder
+      const filePath = `${user.id}/${fileName}`;
 
-      // 1. Upload to Storage
       const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-
+        .upload(filePath, file, { cacheControl: "3600", upsert: true });
       if (uploadError) throw uploadError;
 
-      // 2. Generate a short-lived signed URL for immediate UI display
       const { data: urlData, error: urlError } = await supabase.storage
         .from(STORAGE_BUCKET)
-        .createSignedUrl(filePath, 3600); // 1-hour URL; re-fetched on next page load
-
+        .createSignedUrl(filePath, 3600);
       if (urlError) throw urlError;
 
-      // 3. Save/update file metadata in user_files
-      //    user_profile_id = surrogate PK from user_profiles (NOT auth UID)
-      //    file_type replaces document_type; file_path is the storage path for later ops
       const { data: upsertData, error: dbError } = await supabase
-        .from('user_files')                   // was: 'user_documents'
-        .upsert({
-          user_profile_id: user.profileId,    // was: user_id: user.id — must use surrogate PK
-          file_type: type,                    // was: document_type: type
-          file_name: file.name,
-          file_path: filePath,               // storage path — required for delete and signed URL
-          bucket_name: STORAGE_BUCKET,
-          mime_type: file.type,
-          file_size_bytes: file.size,
-        }, {
-          onConflict: 'user_profile_id,file_type', // matches one_file_per_user_per_type constraint
-        })
-        .select('id, created_at')
+        .from("user_files")
+        .upsert(
+          {
+            user_profile_id: user.profileId,
+            file_type: type,
+            file_name: file.name,
+            file_path: filePath,
+            bucket_name: STORAGE_BUCKET,
+            mime_type: file.type,
+            file_size_bytes: file.size,
+            is_current: true,
+          },
+          { onConflict: "user_profile_id,file_type" },
+        )
+        .select("id, created_at")
         .single();
-
       if (dbError) throw dbError;
 
-      // 4. Update UI state with the full document shape
-      const newDoc: UserDocument = {
-        id: upsertData?.id || '',
+      setCoverLetter({
+        id: upsertData?.id ?? "",
         file_type: type,
         file_name: file.name,
         file_path: filePath,
-        file_url: urlData?.signedUrl || '',
+        file_url: urlData?.signedUrl ?? "",
         mime_type: file.type,
         file_size_bytes: file.size,
-        created_at: upsertData?.created_at || new Date().toISOString(),
-      };
-
-      setCoverLetter(newDoc);
-
-    } catch (error: any) {
-      console.error("Upload Error:", error.message);
-      setUploadErrors((current) => ({
-        ...current,
-        [type]: error.message || "Failed to upload document.",
+        created_at: upsertData?.created_at ?? new Date().toISOString(),
+        is_current: true,
+      });
+    } catch (err: any) {
+      console.error("Upload error:", err.message);
+      setUploadErrors((cur) => ({
+        ...cur,
+        [type]: err.message ?? "Failed to upload document.",
       }));
     } finally {
       setUploadingType(null);
     }
   };
 
-  const confirmDelete = async () => {
-    const docToDelete = pendingDelete === "resume" ? resume : coverLetter;
-    if (!docToDelete || !user) return setPendingDelete(null);
+  // ── Set active resume (Premium) ───────────────────────────────────
+  const handleSetActive = (resumeId: string) => {
+    setResumes((prev) =>
+      prev.map((r) => ({ ...r, is_current: r.id === resumeId })),
+    );
+  };
 
-    const STORAGE_BUCKET = "user-documents"; // correct bucket name (was: "documents")
+  // ── Delete handler ────────────────────────────────────────────────
+  const confirmDelete = async () => {
+    const doc = pendingDeleteDoc;
+    if (!doc || !user) return setPendingDeleteDoc(null);
 
     try {
-      // 1. Delete from Storage using file_path (was incorrectly using docToDelete.id)
       const { error: storageError } = await supabase.storage
         .from(STORAGE_BUCKET)
-        .remove([docToDelete.file_path]);   // was: [docToDelete.id] — file_path is the storage key
-
+        .remove([doc.file_path]);
       if (storageError) throw storageError;
 
-      // 2. Delete row from user_files (was: 'user_documents')
       const { error: dbError } = await supabase
-        .from('user_files')               // was: 'user_documents'
+        .from("user_files")
         .delete()
-        .eq('id', docToDelete.id);
-
+        .eq("id", doc.id);
       if (dbError) throw dbError;
 
-      // 3. Update UI
-      if (pendingDelete === "resume") setResume(null);
-      if (pendingDelete === "cover_letter") setCoverLetter(null);
+      if (doc.file_type === "resume") {
+        setResumes((prev) => {
+          const remaining = prev.filter((r) => r.id !== doc.id);
+          // If we deleted the active one, make the most-recent remaining one active
+          if (doc.is_current && remaining.length > 0) {
+            return [{ ...remaining[0], is_current: true }, ...remaining.slice(1)];
+          }
+          return remaining;
+        });
+      } else {
+        setCoverLetter(null);
+      }
 
-      setPendingDelete(null);
-
-    } catch (error: any) {
-      console.error("Delete Error:", error.message);
-      alert("Failed to delete document.");
-      setPendingDelete(null);
+      setPendingDeleteDoc(null);
+    } catch (err: any) {
+      console.error("Delete error:", err.message);
+      alert("Failed to delete document. Please try again.");
+      setPendingDeleteDoc(null);
     }
   };
 
   if (isLoading) {
-    return <div className="flex min-h-screen items-center justify-center">Loading Dashboard...</div>;
+    return <div className="flex min-h-screen items-center justify-center">Loading Dashboard…</div>;
   }
   if (!user) return null;
 
@@ -224,6 +239,7 @@ export function DashboardPage({
     <>
       <div className="min-w-0 flex-1">
         <main className="mx-auto max-w-6xl px-4 py-8 md:px-8">
+
           {/* Welcome */}
           <section className="mb-8">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
@@ -249,25 +265,21 @@ export function DashboardPage({
               label="Resume Status"
               value={
                 <span className="inline-flex items-center gap-2">
-                  {resume ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-amber-500" />
-                  )}
-                  {resume ? "Uploaded" : "Missing"}
+                  {activeResume
+                    ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                    : <AlertCircle className="h-5 w-5 text-amber-500" />}
+                  {activeResume ? "Uploaded" : "Missing"}
                 </span>
               }
-              tone={resume ? "good" : "warn"}
+              tone={activeResume ? "good" : "warn"}
             />
             <StatCard
               label="Cover Letter Status"
               value={
                 <span className="inline-flex items-center gap-2">
-                  {coverLetter ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-amber-500" />
-                  )}
+                  {coverLetter
+                    ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                    : <AlertCircle className="h-5 w-5 text-amber-500" />}
                   {coverLetter ? "Uploaded" : "Missing"}
                 </span>
               }
@@ -279,15 +291,29 @@ export function DashboardPage({
 
           {/* Documents */}
           <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <DocumentSection
-              title="Resume"
-              type="resume"
-              doc={resume}
-              isUploading={uploadingType === "resume"}
-              uploadError={uploadErrors.resume}
-              onUpload={(f) => handleUpload("resume", f)}
-              onRequestDelete={() => setPendingDelete("resume")}
-            />
+            {isPremium ? (
+              // Premium: multi-resume library with Set Active
+              <ResumeLibrary
+                resumes={resumes}
+                isUploading={uploadingType === "resume"}
+                uploadError={uploadErrors.resume}
+                onUpload={(f) => handleUpload("resume", f)}
+                onDelete={(r) => setPendingDeleteDoc(r)}
+                onSetActive={handleSetActive}
+              />
+            ) : (
+              // Free / Basic: single resume card
+              <DocumentSection
+                title="Resume"
+                type="resume"
+                doc={activeResume}
+                isUploading={uploadingType === "resume"}
+                uploadError={uploadErrors.resume}
+                onUpload={(f) => handleUpload("resume", f)}
+                onRequestDelete={() => activeResume && setPendingDeleteDoc(activeResume)}
+              />
+            )}
+
             <DocumentSection
               title="Cover Letter"
               type="cover_letter"
@@ -295,21 +321,59 @@ export function DashboardPage({
               isUploading={uploadingType === "cover_letter"}
               uploadError={uploadErrors.cover_letter}
               onUpload={(f) => handleUpload("cover_letter", f)}
-              onRequestDelete={() => setPendingDelete("cover_letter")}
+              onRequestDelete={() => coverLetter && setPendingDeleteDoc(coverLetter)}
             />
           </div>
 
           <DocumentGenerators />
 
-          {/* Recent searches */}
           <RecentSearches searches={searches} />
         </main>
       </div>
 
       <ConfirmDeleteModal
-        open={pendingDelete !== null}
-        type={pendingDelete}
-        onCancel={() => setPendingDelete(null)}
+        open={pendingDeleteDoc !== null}
+        type={pendingDeleteDoc?.file_type ?? null}
+        onCancel={() => setPendingDeleteDoc(null)}
+        onConfirm={confirmDelete}
+      />
+    </>
+  );
+}
+
+export default DashboardPage;
+           <DocumentSection
+                title="Resume"
+                type="resume"
+                doc={activeResume}
+                isUploading={uploadingType === "resume"}
+                uploadError={uploadErrors.resume}
+                onUpload={(f) => handleUpload("resume", f)}
+                onRequestDelete={() => activeResume && setPendingDeleteDoc(activeResume)}
+              />
+            )}
+
+            <DocumentSection
+              title="Cover Letter"
+              type="cover_letter"
+              doc={coverLetter}
+              isUploading={uploadingType === "cover_letter"}
+              uploadError={uploadErrors.cover_letter}
+              onUpload={(f) => handleUpload("cover_letter", f)}
+              onRequestDelete={() => coverLetter && setPendingDeleteDoc(coverLetter)}
+            />
+          </div>
+
+          <DocumentGenerators />
+
+          <RecentSearches searches={searches} />
+        </main>
+      </div>
+
+      <ConfirmDeleteModal
+        open={pendingDeleteDoc !== null}
+        type={pendingDeleteDoc?.file_type ?? null}
+        onCancel={() => setPendingDeleteDoc(null)}
         onConfirm={confirmDelete}
       />
     </>

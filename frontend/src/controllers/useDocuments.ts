@@ -11,6 +11,7 @@ export interface UserDocument {
   mime_type: string;
   file_size_bytes?: number | null;
   created_at: string;                     // was: uploaded_at (matches user_files.created_at)
+  is_current?: boolean;                   // KAN-37: active resume flag (Migration 003)
 }
 
 export function useDocuments(initialDocs: UserDocument[] = []) {
