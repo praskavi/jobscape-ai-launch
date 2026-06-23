@@ -8,6 +8,7 @@
 *.xlsx
 *.xlsm
 *.csv
+*.txt
 *.png
 *.jpg
 *.jpeg

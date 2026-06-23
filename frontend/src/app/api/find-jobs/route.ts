@@ -45,6 +45,15 @@ function buildMatchSummary(score: number) {
   return "Low resume fit; significant tailoring may be needed for this role.";
 }
 
+type SavedResume = {
+  id: string;
+  file_name: string;
+  file_path: string;
+  mime_type: string | null;
+  file_size_bytes: number | null;
+  created_at: string;
+};
+
 async function getUserProfileId(supabaseClient: ReturnType<typeof createRouteSupabaseClient>, authUserId: string) {
   const { data } = await supabaseClient
     .from("user_profiles")
@@ -55,6 +64,56 @@ async function getUserProfileId(supabaseClient: ReturnType<typeof createRouteSup
   return data?.id || null;
 }
 
+async function getSavedResume(supabaseClient: ReturnType<typeof createRouteSupabaseClient>, userProfileId: string | null) {
+  if (!userProfileId) return null;
+
+  const { data } = await supabaseClient
+    .from("user_files")
+    .select("id, file_name, file_path, mime_type, file_size_bytes, created_at")
+    .eq("user_profile_id", userProfileId)
+    .eq("file_type", "resume")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<SavedResume>();
+
+  return data || null;
+}
+
+async function getSavedResumeText(
+  supabaseClient: ReturnType<typeof createRouteSupabaseClient>,
+  userProfileId: string | null
+) {
+  const savedResume = await getSavedResume(supabaseClient, userProfileId);
+
+  if (!savedResume) {
+    return {
+      error: NextResponse.json(
+        { error: "No saved resume found. Upload a resume from the Dashboard or Documents page first." },
+        { status: 400 }
+      ),
+      resume: null,
+      text: "",
+    };
+  }
+
+  const { data, error } = await supabaseClient.storage
+    .from("user-documents")
+    .download(savedResume.file_path);
+
+  if (error || !data) {
+    return {
+      error: NextResponse.json({ error: "Could not load your saved resume." }, { status: 500 }),
+      resume: null,
+      text: "",
+    };
+  }
+
+  const buffer = Buffer.from(await data.arrayBuffer());
+  const text = await extractTextFromFile(buffer, savedResume.mime_type || "", savedResume.file_name);
+
+  return { error: null, resume: savedResume, text };
+}
+
 export async function GET(request: Request) {
   const corsResponse = handleCors(request);
   if (corsResponse.response && !corsResponse.isAllowed) return corsResponse.response;
@@ -63,6 +122,8 @@ export async function GET(request: Request) {
   if (auth.response) return auth.response;
 
   const supabase = createRouteSupabaseClient(request);
+  const userProfileId = await getUserProfileId(supabase, auth.user!.id);
+  const savedResume = await getSavedResume(supabase, userProfileId);
   const { data, error } = await supabase
     .from("ai_job_match_runs")
     .select("id, job_title, location, result_count, matches, scoring_version, created_at")
@@ -79,6 +140,7 @@ export async function GET(request: Request) {
     success: true,
     cached: Boolean(data),
     latest: data || null,
+    savedResume,
   });
 }
 
@@ -96,33 +158,24 @@ export async function POST(request: Request) {
   if (entitlement.response) return entitlement.response;
   const resultLimit = entitlement.entitlement?.plan_code === "premium" ? 20 : 10;
 
-  let formData: FormData;
-  try {
-    formData = await request.formData();
-  } catch (err) {
-    return NextResponse.json({ error: "Invalid form data format" }, { status: 400 });
-  }
-
-  const resumeFile = formData.get("resume") as File | null;
-  const rawJobTitle = formData.get("jobTitle");
+  const formData = await request.formData().catch(() => null);
+  const rawJobTitle = formData?.get("jobTitle");
   const jobTitle = (rawJobTitle && rawJobTitle !== "null" && rawJobTitle !== "") ? rawJobTitle.toString() : null;
 
-  const rawLocation = formData.get("location");
+  const rawLocation = formData?.get("location");
   const location = (rawLocation && rawLocation !== "null" && rawLocation !== "") ? rawLocation.toString() : null;
 
-  if (!resumeFile) {
-    return NextResponse.json({ error: "Missing resume file" }, { status: 400 });
-  }
-
-  const maxFileSize = 5 * 1024 * 1024; 
-  if (resumeFile.size > maxFileSize) {
-    return NextResponse.json({ error: "File exceeds 5MB limit." }, { status: 415 });
-  }
-
   try {
-    const arrayBuffer = await resumeFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const extractedText = await extractTextFromFile(buffer, resumeFile.type, resumeFile.name);
+    const supabaseAdmin = createRouteSupabaseClient(request);
+    const userProfileId = await getUserProfileId(supabaseAdmin, auth.user!.id);
+    const savedResumeResult = await getSavedResumeText(supabaseAdmin, userProfileId);
+
+    if (savedResumeResult.error) {
+      return savedResumeResult.error;
+    }
+
+    const extractedText = savedResumeResult.text;
+    const savedResume = savedResumeResult.resume;
     
     if (!extractedText.trim()) throw new Error("Could not extract text from document.");
 
@@ -143,7 +196,6 @@ export async function POST(request: Request) {
 
     const vectorEmbedding = await hfResponse.json();
     if (!Array.isArray(vectorEmbedding) || !Array.isArray(vectorEmbedding[0])) throw new Error("Unexpected vector format received from AI model.");
-    const supabaseAdmin = createRouteSupabaseClient(request);
 
     // parallel chunk searching
     const searchPromises = vectorEmbedding.map((chunkVector: number[]) => 
@@ -212,12 +264,12 @@ export async function POST(request: Request) {
 
     formattedMatches.sort((a, b) => b.matchPercentage - a.matchPercentage);
     const slicedMatches = formattedMatches.slice(0, resultLimit);
-    const userProfileId = await getUserProfileId(supabaseAdmin, auth.user!.id);
     const resumeHash = createHash("sha256").update(extractedText).digest("hex");
 
     const { error: cacheError } = await supabaseAdmin.from("ai_job_match_runs").insert({
       user_id: auth.user!.id,
       user_profile_id: userProfileId,
+      resume_file_id: savedResume?.id || null,
       resume_hash: resumeHash,
       job_title: jobTitle,
       location,
@@ -232,7 +284,7 @@ export async function POST(request: Request) {
 
     await recordFeatureUsage(request, auth.user!.id, "ai_job_match", auth.user!.email);
 
-    return NextResponse.json({ success: true, matches: slicedMatches });
+    return NextResponse.json({ success: true, matches: slicedMatches, savedResume });
 
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "An error occurred during analysis." }, { status: 500 });

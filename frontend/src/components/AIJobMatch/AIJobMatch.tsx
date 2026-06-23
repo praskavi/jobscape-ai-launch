@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { 
-  Search, MapPin, AlertCircle, FileText, UploadCloud, X, Briefcase, Sparkles
+  Search, MapPin, AlertCircle, FileText, X, Briefcase, Sparkles
 } from "lucide-react";
 import { supabase } from "@/controllers/suabaseClient";
 import { useRouter } from "next/navigation";
@@ -24,6 +24,13 @@ interface JobMatch {
   aiSummary?: string;
 }
 
+interface SavedResume {
+  id: string;
+  file_name: string;
+  file_size_bytes?: number | null;
+  created_at?: string;
+}
+
 async function getApiErrorMessage(response: Response, fallback: string) {
   const errorData = await response.json().catch(() => null);
 
@@ -42,13 +49,19 @@ async function getApiErrorMessage(response: Response, fallback: string) {
   return errorData?.message || errorData?.error || fallback;
 }
 
+function buildFallbackSummary(score: number) {
+  if (score >= 80) return "Strong resume fit based on ATS keyword and semantic matching.";
+  if (score >= 60) return "Good resume fit with a few areas to tailor before applying.";
+  if (score >= 40) return "Partial resume fit; review missing requirements before applying.";
+  return "Low resume fit; significant tailoring may be needed for this role.";
+}
+
 export function AIJobMatch() {
   const router = useRouter();
 
   const [jobTitle, setJobTitle] = React.useState("");
   const [location, setLocation] = React.useState("");
-  const [resumeFile, setResumeFile] = React.useState<File | null>(null);
-  const [isDragging, setIsDragging] = React.useState(false);
+  const [savedResume, setSavedResume] = React.useState<SavedResume | null>(null);
   
   const [isSearching, setIsSearching] = React.useState(false);
   const [isLoadingCachedResults, setIsLoadingCachedResults] = React.useState(true);
@@ -85,6 +98,10 @@ export function AIJobMatch() {
         const data = await response.json();
         const cachedMatches = Array.isArray(data.latest?.matches) ? data.latest.matches : [];
 
+        if (isMounted) {
+          setSavedResume(data.savedResume || null);
+        }
+
         if (isMounted && cachedMatches.length > 0) {
           setResults(cachedMatches);
           setHasSearched(true);
@@ -106,53 +123,12 @@ export function AIJobMatch() {
     };
   }, []);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-  
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-  
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      validateAndSetFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      validateAndSetFile(e.target.files[0]);
-    }
-  };
-
-  const validateAndSetFile = (file: File) => {
-    const validTypes = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
-    if (!validTypes.includes(file.type)) {
-      setError("Invalid format. Please upload a PDF or Word document.");
-      return;
-    }
-    setError(null);
-    setResumeFile(file);
-    setHasSearched(false);
-    setCachedResultDate(null);
-    setResults([]);
-  };
-
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
 
-    if (!resumeFile) {
-      setError("Please upload your resume to find matches.");
+    if (!savedResume) {
+      setError("Upload a resume from the Dashboard or Documents page before finding matches.");
       return;
     }
 
@@ -167,7 +143,6 @@ export function AIJobMatch() {
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const formData = new FormData();
-      formData.append("resume", resumeFile);
       formData.append("jobTitle", jobTitle);
       formData.append("location", location);
 
@@ -183,6 +158,7 @@ export function AIJobMatch() {
 
       const data = await response.json();
       setResults(data.matches || []);
+      setSavedResume(data.savedResume || savedResume);
       setHasSearched(true);
       setCachedResultDate(new Date().toISOString());
     } catch (err: any) {
@@ -230,41 +206,31 @@ export function AIJobMatch() {
         </div>
 
         {/* Upload Area */}
-        {!resumeFile ? (
-          <div 
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed py-10 px-6 text-center transition-all duration-200 
-              ${isDragging ? 'border-blue-500 bg-blue-50/50 scale-[1.01]' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}
-          >
-            <UploadCloud className="h-8 w-8 text-blue-600 mb-3" />
-            <p className="text-base font-medium text-gray-900">Drag & drop your resume</p>
-            <p className="text-sm text-gray-500 mt-1 mb-4">PDF, DOC, DOCX up to 5MB</p>
-            <label htmlFor="resume-upload" className="cursor-pointer inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors">
-              Browse Files
-            </label>
-            <input id="resume-upload" type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleFileChange} />
+        {!isLoadingCachedResults && !savedResume ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 py-10 px-6 text-center">
+            <FileText className="h-8 w-8 text-gray-300 mb-3" />
+            <p className="text-base font-medium text-gray-900">No saved resume found</p>
+            <p className="text-sm text-gray-500 mt-1 mb-4">Upload your resume once from Documents or Dashboard to use AI Job Match.</p>
+            <button
+              onClick={() => router.push("/documents")}
+              className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
+            >
+              Go to Documents
+            </button>
           </div>
-        ) : (
+        ) : savedResume ? (
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-2xl shadow-sm">
               <div className="flex items-center gap-3 overflow-hidden">
                 <FileText className="h-5 w-5 text-blue-600 shrink-0" />
                 <span className="text-base font-medium text-gray-900 truncate">
-                  {resumeFile.name}
+                  {savedResume.file_name}
                 </span>
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full uppercase tracking-wide">
-                  Selected
+                  Saved Resume
                 </span>
-                <button 
-                  onClick={() => { setResumeFile(null); setHasSearched(false); setCachedResultDate(null); setResults([]); }}
-                  className="p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
               </div>
             </div>
             
@@ -278,7 +244,7 @@ export function AIJobMatch() {
               {isSearching ? "Analyzing Profile..." : hasSearched ? "Analysis Complete" : "Find Best Matches"}
             </button>
           </div>
-        )}
+        ) : null}
 
         {error && (
           <div className="flex items-start gap-2 rounded-xl bg-rose-50 p-4 text-sm text-rose-600 border border-rose-100">
@@ -301,7 +267,7 @@ export function AIJobMatch() {
           </div>
         )}
 
-        {!isLoadingCachedResults && !isSearching && !hasSearched && resumeFile && (
+        {!isLoadingCachedResults && !isSearching && !hasSearched && savedResume && (
            <div className="flex flex-col items-center justify-center py-12 border border-dashed border-gray-200 rounded-2xl bg-gray-50/50 mt-4">
              <Briefcase className="h-10 w-10 text-gray-300 mb-3" />
              <h3 className="text-gray-500 font-medium text-sm">Ready to scan against active job listings</h3>
@@ -407,6 +373,51 @@ export function AIJobMatch() {
 
             {/* Modal Body (Scrollable Job Description) */}
             <div className="p-6 overflow-y-auto flex-1 bg-gray-50/50">
+              <div className="mb-6 rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-2">AI Match Summary</h3>
+                <p className="text-sm text-gray-700">
+                  {selectedJob.aiSummary || buildFallbackSummary(selectedJob.matchPercentage)}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mb-6">
+                <div className="rounded-xl border border-green-100 bg-white p-4 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-gray-900">Skills Matched</h3>
+                    <span className="text-xs font-semibold text-green-700">{selectedJob.matchedKeywords?.length || 0}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedJob.matchedKeywords || []).length > 0 ? (
+                      selectedJob.matchedKeywords?.map((keyword) => (
+                        <span key={keyword} className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+                          {keyword}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No strong skill matches found.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-rose-100 bg-white p-4 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-gray-900">Missing / Tailor</h3>
+                    <span className="text-xs font-semibold text-rose-700">{selectedJob.missingKeywords?.length || 0}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedJob.missingKeywords || []).length > 0 ? (
+                      selectedJob.missingKeywords?.map((keyword) => (
+                        <span key={keyword} className="rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
+                          {keyword}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No major gaps detected for this role.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Job Description</h3>
               <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
                 {selectedJob.description || "No description provided by the database."}
