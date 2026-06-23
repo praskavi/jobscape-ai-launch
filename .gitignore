@@ -5,6 +5,7 @@
 *.doc
 *.docx
 *.sql
+!supabase/migrations/20260624_020_fix_linter_security_findings.sql
 *.pdf
 *.xls
 *.xlsx

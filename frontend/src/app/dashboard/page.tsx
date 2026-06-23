@@ -10,14 +10,16 @@ export const metadata = {
 
 export default async function Dashboard() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
-  // 1. Fetch User Profile + plan tier
   let finalName = "User";
   let profileId = "";
-  let planCode = "free";
 
   const { data: profileData } = await supabase
     .from("user_profiles")
@@ -27,7 +29,9 @@ export default async function Dashboard() {
 
   if (profileData) {
     profileId = profileData.id;
-    if (profileData.full_name) finalName = profileData.full_name;
+    if (profileData.full_name) {
+      finalName = profileData.full_name;
+    }
   } else {
     finalName =
       user.user_metadata?.full_name ||
@@ -36,7 +40,6 @@ export default async function Dashboard() {
       "User";
   }
 
-  // Fetch plan code to determine resume fetch strategy
   const { data: subData } = await supabase
     .from("user_subscriptions")
     .select("subscription_plans!inner(plan_code)")
@@ -46,11 +49,9 @@ export default async function Dashboard() {
     .limit(1)
     .maybeSingle();
 
-  planCode = (subData as any)?.subscription_plans?.plan_code ?? "free";
+  const planCode = (subData as any)?.subscription_plans?.plan_code ?? "free";
   const isPremium = planCode === "premium";
 
-  // 2. Fetch User Documents
-  // KAN-37: Premium fetches all stored resumes (up to 3). Free/Basic fetches only the active one.
   let resume = null;
   let allResumes: any[] = [];
   let coverLetter = null;
@@ -62,6 +63,7 @@ export default async function Dashboard() {
       const { data: urlData } = await supabase.storage
         .from(STORAGE_BUCKET)
         .createSignedUrl(dbFile.file_path, 3600);
+
       return {
         id: dbFile.id,
         file_type: dbFile.file_type as "resume" | "cover_letter",
@@ -76,7 +78,6 @@ export default async function Dashboard() {
     };
 
     if (isPremium) {
-      // Premium: fetch all stored resumes, ordered by created_at desc
       const { data: resumesData } = await supabase
         .from("user_files")
         .select("*")
@@ -112,60 +113,11 @@ export default async function Dashboard() {
       .eq("is_current", true)
       .maybeSingle();
 
-    if (coverLetterDb) coverLetter = await formatDoc(coverLetterDb);
-  }
-
-  // 3. Recent AI job match runs (search_history table doesn't exist — KAN-37 bug fix)
-  const { data: searchData } = await supabase
-    .from("ai_job_match_runs")
-    .select("id, job_title, location, result_count, created_at")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(5);
-
-  return (
-    <DashboardPage
-      initialUser={{ id: user.id, email: user.email || "", full_name: finalName, profileId }}
-      initialResume={resume}
-      initialResumes={allResumes}
-      initialCoverLetter={coverLetter}
-      initialSearches={searchData || []}
-    />
-  );
-}
-    resume = allResumes.find((r) => r.is_current) ?? allResumes[0];
-      }
-    } else {
-      // Free / Basic: only the active resume
-      const { data: resumeDb } = await supabase
-        .from("user_files")
-        .select("*")
-        .eq("user_profile_id", profileId)
-        .eq("file_type", "resume")
-        .eq("is_current", true)
-        .maybeSingle();
-
-      if (resumeDb) {
-        resume = await formatDoc(resumeDb);
-        allResumes = [resume];
-      }
-    }
-
-    // Cover letter (always single)
-    const { data: coverLetterDb } = await supabase
-      .from("user_files")
-      .select("*")
-      .eq("user_profile_id", profileId)
-      .eq("file_type", "cover_letter")
-      .eq("is_current", true)
-      .maybeSingle();
-
     if (coverLetterDb) {
       coverLetter = await formatDoc(coverLetterDb);
     }
   }
 
-  // 3. Fetch search history — uses ai_job_match_runs (search_history table does not exist)
   const { data: searchData } = await supabase
     .from("ai_job_match_runs")
     .select("id, job_title, location, result_count, created_at")
@@ -179,7 +131,7 @@ export default async function Dashboard() {
         id: user.id,
         email: user.email || "",
         full_name: finalName,
-        profileId: profileId,
+        profileId,
       }}
       initialResume={resume}
       initialResumes={allResumes}

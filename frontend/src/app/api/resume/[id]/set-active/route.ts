@@ -48,7 +48,7 @@ function createRouteSupabaseClient(request: Request) {
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   // 1. CORS
   const corsResponse = handleCors(request);
@@ -65,7 +65,7 @@ export async function PATCH(
     return auth.response;
   }
 
-  const resumeId = params.id;
+  const { id: resumeId } = await params;
   if (!resumeId) {
     return withCors(
       NextResponse.json({ error: "Missing resume ID." }, { status: 400 }),
