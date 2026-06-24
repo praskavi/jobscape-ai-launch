@@ -117,6 +117,34 @@ WHERE sf.id = pf.feature_id
   AND sf.feature_code = 'resume_upload';
 ```
 
+### Migration 021 — `20260624_021_restore_my_files_is_current.sql`
+
+Migration 020 fixed the Supabase `security_definer_view` linter finding by recreating `public.my_files` as a `security_invoker` view. That forward migration accidentally omitted `uf.is_current` from the view projection.
+
+Migration 021 restores the active-resume flag while keeping `security_invoker = true`:
+
+```sql
+CREATE OR REPLACE VIEW public.my_files
+WITH (security_invoker = true)
+AS
+  SELECT
+    uf.id,
+    uf.user_profile_id,
+    up.user_id AS auth_user_id,
+    uf.file_type,
+    uf.file_name,
+    uf.file_path,
+    uf.bucket_name,
+    uf.mime_type,
+    uf.file_size_bytes,
+    uf.is_current,
+    uf.created_at,
+    uf.updated_at
+  FROM public.user_files uf
+  JOIN public.user_profiles up ON up.id = uf.user_profile_id
+  WHERE up.user_id = auth.uid();
+```
+
 ---
 
 ## API Changes

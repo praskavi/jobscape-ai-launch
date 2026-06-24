@@ -6,6 +6,8 @@
 *.docx
 *.sql
 !supabase/migrations/20260624_020_fix_linter_security_findings.sql
+!supabase/migrations/20260624_021_restore_my_files_is_current.sql
+!supabase/migrations/20260624_022_enable_job_chunks_rls.sql
 *.pdf
 *.xls
 *.xlsx
