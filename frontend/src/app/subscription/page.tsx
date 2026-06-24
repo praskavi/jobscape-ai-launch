@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
-import { Check, CircleSlash, Crown, Gauge, ShieldCheck } from "lucide-react";
+import { BillingActionButton } from "@/components/subscription/BillingActionButton";
+import { Check, Crown, Gauge, ShieldCheck } from "lucide-react";
 import { redirect } from "next/navigation";
 
 export const metadata = {
@@ -274,26 +275,13 @@ export default async function SubscriptionPage() {
                 ))}
               </ul>
 
-              <button
-                type="button"
-                disabled={isCurrent}
-                className={`mt-7 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
-                  isCurrent
-                    ? "cursor-not-allowed bg-muted text-muted-foreground"
-                    : plan.highlighted
-                      ? "bg-background text-foreground hover:opacity-90"
-                      : "bg-foreground text-background hover:opacity-90"
-                }`}
-              >
-                {isCurrent ? (
-                  <>
-                    <CircleSlash className="h-4 w-4" />
-                    Current plan
-                  </>
-                ) : (
-                  `Choose ${plan.name}`
-                )}
-              </button>
+              <BillingActionButton
+                planCode={plan.code}
+                planName={plan.name}
+                currentPlanCode={currentPlan.code}
+                isCurrent={isCurrent}
+                highlighted={plan.highlighted}
+              />
             </div>
           );
         })}

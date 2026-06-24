@@ -8,6 +8,9 @@
 !supabase/migrations/20260624_020_fix_linter_security_findings.sql
 !supabase/migrations/20260624_021_restore_my_files_is_current.sql
 !supabase/migrations/20260624_022_enable_job_chunks_rls.sql
+!supabase/migrations/20260624_023_add_stripe_plan_price_ids.sql
+!supabase/migrations/20260624_024_add_stripe_subscription_unique_key.sql
+!supabase/migrations/20260624_025_create_user_billing_customers.sql
 *.pdf
 *.xls
 *.xlsx
