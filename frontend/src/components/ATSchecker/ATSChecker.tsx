@@ -28,6 +28,16 @@ interface AnalysisResult {
   } | null;
 }
 
+interface StoredResume {
+  id: string;
+  file_name: string;
+  file_path: string;
+  mime_type: string | null;
+  file_size_bytes: number | null;
+  created_at: string;
+  is_current?: boolean;
+}
+
 async function getApiErrorMessage(response: Response, fallback: string) {
   const errorData = await response.json().catch(() => null);
 
@@ -49,6 +59,9 @@ async function getApiErrorMessage(response: Response, fallback: string) {
 export function ATSChecker() {
   const { refresh: refreshSubscription } = useSubscription();
   const [resumeFile, setResumeFile] = React.useState<File | null>(null);
+  const [storedResumes, setStoredResumes] = React.useState<StoredResume[]>([]);
+  const [selectedResumeId, setSelectedResumeId] = React.useState<string>("");
+  const [isLoadingResumes, setIsLoadingResumes] = React.useState(true);
   const [jobDescription, setJobDescription] = React.useState("");
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -68,6 +81,75 @@ export function ATSChecker() {
       setJobDescription(jdFromUrl);
     }
   }, [searchParams]);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    async function loadStoredResumes() {
+      setIsLoadingResumes(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        if (isMounted) {
+          setStoredResumes([]);
+          setSelectedResumeId("");
+          setIsLoadingResumes(false);
+        }
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle<{ id: string }>();
+
+      if (!profile?.id) {
+        if (isMounted) {
+          setStoredResumes([]);
+          setSelectedResumeId("");
+          setIsLoadingResumes(false);
+        }
+        return;
+      }
+
+      const { data: resumes, error: resumesError } = await supabase
+        .from("user_files")
+        .select("id, file_name, file_path, mime_type, file_size_bytes, created_at, is_current")
+        .eq("user_profile_id", profile.id)
+        .eq("file_type", "resume")
+        .order("created_at", { ascending: false });
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (resumesError || !resumes?.length) {
+        setStoredResumes([]);
+        setSelectedResumeId("");
+        setIsLoadingResumes(false);
+        return;
+      }
+
+      setStoredResumes(resumes);
+      setSelectedResumeId((current) => {
+        if (current && resumes.some((resume) => resume.id === current)) {
+          return current;
+        }
+        return resumes.find((resume) => resume.is_current)?.id ?? resumes[0].id;
+      });
+      setIsLoadingResumes(false);
+    }
+
+    loadStoredResumes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -86,6 +168,7 @@ export function ATSChecker() {
       
       setError(null);
       setResumeFile(file);
+      setSelectedResumeId("");
       
       // Unlock the scan button when a new file is added
       setSuccess(false); 
@@ -107,7 +190,7 @@ export function ATSChecker() {
     setSuccess(false);
     setResult(null); 
 
-    if (!resumeFile) return setError("Please upload a resume first.");
+    if (!resumeFile && !selectedResumeId) return setError("Please choose a saved resume or upload one first.");
     if (!jobDescription.trim()) return setError("Please provide a job description.");
 
     setIsAnalyzing(true);
@@ -120,7 +203,11 @@ export function ATSChecker() {
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const formData = new FormData();
-      formData.append("resume", resumeFile);
+      if (selectedResumeId) {
+        formData.append("resumeFileId", selectedResumeId);
+      } else if (resumeFile) {
+        formData.append("resume", resumeFile);
+      }
       formData.append("jobDescription", jobDescription);
       formData.append("fetchAdvancedAI", "false"); // Tell backend to skip AI
 
@@ -148,7 +235,7 @@ export function ATSChecker() {
 
   // Advanced scan: Calls the AI only when clicked
   const handleFetchAdvancedAI = async () => {
-    if (!resumeFile || !jobDescription) return;
+    if ((!resumeFile && !selectedResumeId) || !jobDescription) return;
     
     setAiError(null);
     setIsFetchingAI(true);
@@ -158,7 +245,11 @@ export function ATSChecker() {
       const headers: Record<string, string> = session?.access_token ? { "Authorization": `Bearer ${session.access_token}` } : {};
 
       const formData = new FormData();
-      formData.append("resume", resumeFile);
+      if (selectedResumeId) {
+        formData.append("resumeFileId", selectedResumeId);
+      } else if (resumeFile) {
+        formData.append("resume", resumeFile);
+      }
       formData.append("jobDescription", jobDescription);
       formData.append("fetchAdvancedAI", "true"); // Trigger AI logic in backend
 
@@ -185,6 +276,9 @@ export function ATSChecker() {
     }
   };
 
+  const selectedStoredResume = storedResumes.find((resume) => resume.id === selectedResumeId);
+  const hasResumeInput = Boolean(selectedResumeId || resumeFile);
+
   const getScoreColor = (score: number) => {
     if (score >= 85) return "text-green-600";
     if (score >= 75) return "text-blue-600";
@@ -196,15 +290,68 @@ export function ATSChecker() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">ATS Resume Checker</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Upload your resume and paste a job description to see how well you match.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Choose one of your saved resumes and paste a job description to see how well you match.</p>
       </div>
       <UsageCounter featureCode="ats_score" label="ATS checks" className="max-w-sm" />
 
       <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-2">
         <div className="flex flex-col gap-2">
           <label className="text-sm font-semibold text-foreground">Resume</label>
-          <div className={`flex min-h-[300px] flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors ${resumeFile ? "border-primary/50 bg-primary/[0.02]" : "border-border bg-surface"}`}>
-            {resumeFile ? (
+          <div className={`flex min-h-[300px] flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors ${hasResumeInput ? "border-primary/50 bg-primary/[0.02]" : "border-border bg-surface"}`}>
+            {isLoadingResumes ? (
+              <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <p className="text-sm">Loading saved resumes...</p>
+              </div>
+            ) : selectedStoredResume ? (
+              <div className="flex w-full max-w-sm flex-col items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">{selectedStoredResume.file_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedStoredResume.file_size_bytes
+                      ? `${(selectedStoredResume.file_size_bytes / 1024 / 1024).toFixed(2)} MB`
+                      : "Saved resume"}
+                    {selectedStoredResume.is_current ? " - Active resume" : ""}
+                  </p>
+                </div>
+
+                {storedResumes.length > 1 && (
+                  <select
+                    value={selectedResumeId}
+                    onChange={(event) => {
+                      setSelectedResumeId(event.target.value);
+                      setResumeFile(null);
+                      setSuccess(false);
+                      setResult(null);
+                    }}
+                    className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    {storedResumes.map((resume) => (
+                      <option key={resume.id} value={resume.id}>
+                        {resume.file_name}{resume.is_current ? " (active)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedResumeId("");
+                      setSuccess(false);
+                      setResult(null);
+                    }}
+                    className="text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Upload a different file
+                  </button>
+                </div>
+              </div>
+            ) : resumeFile ? (
               <div className="flex flex-col items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600">
                   <CheckCircle2 className="h-6 w-6" />
@@ -222,12 +369,34 @@ export function ATSChecker() {
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
                   <Upload className="h-5 w-5 text-blue-600" />
                 </div>
-                <h3 className="text-base font-semibold text-foreground">Upload your resume</h3>
-                <p className="mb-6 mt-1 text-sm text-muted-foreground">Allowed formats: PDF, DOC, DOCX</p>
+                <h3 className="text-base font-semibold text-foreground">
+                  {storedResumes.length ? "Upload a different resume" : "Upload your resume"}
+                </h3>
+                <p className="mb-6 mt-1 text-sm text-muted-foreground">
+                  {storedResumes.length
+                    ? "Or choose one saved in Documents."
+                    : "No saved resume found. Allowed formats: PDF, DOC, DOCX"}
+                </p>
                 <input type="file" id="resume-upload" className="hidden" accept=".pdf,.doc,.docx" onChange={handleFileChange} />
-                <label htmlFor="resume-upload" className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition-colors hover:bg-foreground/90">
-                  <Plus className="h-4 w-4" /> Choose file
-                </label>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  {storedResumes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedResumeId(storedResumes.find((resume) => resume.is_current)?.id ?? storedResumes[0].id);
+                        setResumeFile(null);
+                        setSuccess(false);
+                        setResult(null);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                    >
+                      <FileText className="h-4 w-4" /> Use saved resume
+                    </button>
+                  )}
+                  <label htmlFor="resume-upload" className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition-colors hover:bg-foreground/90">
+                    <Plus className="h-4 w-4" /> Choose file
+                  </label>
+                </div>
               </>
             )}
           </div>
@@ -261,7 +430,7 @@ export function ATSChecker() {
 
           <button
             type="submit"
-            disabled={isAnalyzing || success || !resumeFile || !jobDescription.trim()}
+            disabled={isAnalyzing || success || !hasResumeInput || !jobDescription.trim()}
             className="inline-flex h-11 items-center justify-center rounded-lg bg-blue-600 px-8 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-400"
           >
             {isAnalyzing ? (

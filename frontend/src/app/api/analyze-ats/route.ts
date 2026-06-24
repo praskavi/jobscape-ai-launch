@@ -7,8 +7,48 @@ import { extractTextFromFile } from "@/lib/parsers/extractText";
 import { analyzeResumeMatch } from "@/lib/ai/atsAnalyzer"; 
 import { calculateSemanticAtsScore } from "@/lib/semanticAtsScoring";
 import { recordFeatureUsage, requireFeatureAccess } from "@/lib/subscriptionEntitlements";
+import { createClient } from "@supabase/supabase-js";
 
 const jobDescriptionSchema = z.string().max(10000, "Job description must not exceed 10,000 characters");
+const DEFAULT_STORAGE_BUCKET = "user-documents";
+const allowedMimeTypes = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+const allowedExtensions = [".pdf", ".doc", ".docx"];
+const maxFileSize = 5 * 1024 * 1024;
+
+function getBearerToken(request: Request) {
+  const header = request.headers.get("Authorization");
+  if (!header?.startsWith("Bearer ")) {
+    return null;
+  }
+  return header.slice("Bearer ".length);
+}
+
+function createRouteSupabaseClient(request: Request) {
+  const serviceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+  const bearerToken = getBearerToken(request);
+
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceRoleKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    bearerToken && !serviceRoleKey
+      ? { global: { headers: { Authorization: `Bearer ${bearerToken}` } } }
+      : undefined,
+  );
+}
+
+function validateResumeFileMetadata(filename: string, mimetype: string, filesize: number) {
+  const normalizedFilename = filename.toLowerCase();
+  return (
+    allowedExtensions.some((ext) => normalizedFilename.endsWith(ext)) &&
+    allowedMimeTypes.includes(mimetype) &&
+    filesize <= maxFileSize
+  );
+}
 
 export async function POST(request: Request) {
   const corsResponse = handleCors(request);
@@ -46,25 +86,14 @@ export async function POST(request: Request) {
   }
 
   const resumeFile = formData.get("resume") as File | null;
+  const resumeFileId = formData.get("resumeFileId") as string | null;
   const jobDescription = formData.get("jobDescription") as string | null;
   
   // NEW: Read the flag to determine if AI should run
   const fetchAdvancedAI = formData.get("fetchAdvancedAI") === "true";
 
-  if (!resumeFile) {
+  if (!resumeFile && !resumeFileId) {
     return NextResponse.json({ error: "Missing resume file" }, { status: 400 });
-  }
-
-  const allowedMimeTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-  const allowedExtensions = [".pdf", ".docx"];
-  const maxFileSize = 5 * 1024 * 1024;
-
-  const mimetype = resumeFile.type;
-  const filename = resumeFile.name.toLowerCase();
-  const filesize = resumeFile.size;
-
-  if (!allowedExtensions.some(ext => filename.endsWith(ext)) || !allowedMimeTypes.includes(mimetype) || filesize > maxFileSize) {
-    return NextResponse.json({ error: "Unsupported Media Type or File exceeds 5MB limit." }, { status: 415 });
   }
 
   const jdResult = jobDescriptionSchema.safeParse(jobDescription || "");
@@ -74,8 +103,71 @@ export async function POST(request: Request) {
 
   let extractedText: string;
   try {
-    const arrayBuffer = await resumeFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    let buffer: Buffer;
+    let mimetype: string;
+    let filename: string;
+    let filesize: number;
+
+    if (resumeFileId) {
+      const supabase = createRouteSupabaseClient(request);
+      const { data: profile, error: profileError } = await supabase
+        .from("user_profiles")
+        .select("id")
+        .eq("user_id", auth.user!.id)
+        .maybeSingle<{ id: string }>();
+
+      if (profileError || !profile?.id) {
+        return NextResponse.json({ error: "Could not load user profile." }, { status: 500 });
+      }
+
+      const { data: storedResume, error: resumeError } = await supabase
+        .from("user_files")
+        .select("id, file_name, file_path, bucket_name, mime_type, file_size_bytes")
+        .eq("id", resumeFileId)
+        .eq("user_profile_id", profile.id)
+        .eq("file_type", "resume")
+        .maybeSingle<{
+          id: string;
+          file_name: string;
+          file_path: string;
+          bucket_name: string | null;
+          mime_type: string | null;
+          file_size_bytes: number | null;
+        }>();
+
+      if (resumeError || !storedResume) {
+        return NextResponse.json({ error: "Resume not found or access denied." }, { status: 404 });
+      }
+
+      filename = storedResume.file_name;
+      mimetype = storedResume.mime_type || "application/octet-stream";
+      filesize = storedResume.file_size_bytes ?? 0;
+
+      if (!validateResumeFileMetadata(filename, mimetype, filesize)) {
+        return NextResponse.json({ error: "Unsupported Media Type or File exceeds 5MB limit." }, { status: 415 });
+      }
+
+      const { data: storageFile, error: downloadError } = await supabase.storage
+        .from(storedResume.bucket_name || DEFAULT_STORAGE_BUCKET)
+        .download(storedResume.file_path);
+
+      if (downloadError || !storageFile) {
+        return NextResponse.json({ error: "Failed to load stored resume." }, { status: 500 });
+      }
+
+      buffer = Buffer.from(await storageFile.arrayBuffer());
+    } else {
+      filename = resumeFile!.name;
+      mimetype = resumeFile!.type;
+      filesize = resumeFile!.size;
+
+      if (!validateResumeFileMetadata(filename, mimetype, filesize)) {
+        return NextResponse.json({ error: "Unsupported Media Type or File exceeds 5MB limit." }, { status: 415 });
+      }
+
+      buffer = Buffer.from(await resumeFile!.arrayBuffer());
+    }
+
     extractedText = await extractTextFromFile(buffer, mimetype, filename);
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to extract text from document" }, { status: 400 });
