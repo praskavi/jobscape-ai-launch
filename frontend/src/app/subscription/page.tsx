@@ -219,12 +219,13 @@ export default async function SubscriptionPage() {
       <section className="grid gap-5 lg:grid-cols-3">
         {plans.map((plan) => {
           const isCurrent = plan.code === currentPlan.code;
+          const isEmphasized = isCurrent || (currentPlan.code === "free" && plan.highlighted);
 
           return (
             <div
               key={plan.code}
               className={`rounded-lg border p-6 ${
-                plan.highlighted
+                isEmphasized
                   ? "border-primary/40 bg-foreground text-background shadow-lift"
                   : "border-border bg-surface text-foreground"
               }`}
@@ -233,7 +234,7 @@ export default async function SubscriptionPage() {
                 <div>
                   <p
                     className={`text-sm font-medium ${
-                      plan.highlighted ? "text-background/70" : "text-muted-foreground"
+                      isEmphasized ? "text-background/70" : "text-muted-foreground"
                     }`}
                   >
                     {plan.name}
@@ -242,7 +243,7 @@ export default async function SubscriptionPage() {
                     {plan.price}
                     <span
                       className={`text-sm font-medium ${
-                        plan.highlighted ? "text-background/60" : "text-muted-foreground"
+                        isEmphasized ? "text-background/60" : "text-muted-foreground"
                       }`}
                     >
                       /month
@@ -256,7 +257,7 @@ export default async function SubscriptionPage() {
 
               <p
                 className={`mt-3 text-sm ${
-                  plan.highlighted ? "text-background/70" : "text-muted-foreground"
+                  isEmphasized ? "text-background/70" : "text-muted-foreground"
                 }`}
               >
                 {plan.description}
@@ -267,7 +268,7 @@ export default async function SubscriptionPage() {
                   <li key={feature} className="flex items-start gap-2">
                     <Check
                       className={`mt-0.5 h-4 w-4 shrink-0 ${
-                        plan.highlighted ? "text-lime" : "text-primary"
+                        isEmphasized ? "text-lime" : "text-primary"
                       }`}
                     />
                     <span>{feature}</span>
@@ -280,7 +281,7 @@ export default async function SubscriptionPage() {
                 planName={plan.name}
                 currentPlanCode={currentPlan.code}
                 isCurrent={isCurrent}
-                highlighted={plan.highlighted}
+                highlighted={isEmphasized}
               />
             </div>
           );

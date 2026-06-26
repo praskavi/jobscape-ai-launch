@@ -11,6 +11,7 @@
 !supabase/migrations/20260624_023_add_stripe_plan_price_ids.sql
 !supabase/migrations/20260624_024_add_stripe_subscription_unique_key.sql
 !supabase/migrations/20260624_025_create_user_billing_customers.sql
+!supabase/migrations/20260626_026_fix_subscription_summary_plan_id.sql
 *.pdf
 *.xls
 *.xlsx

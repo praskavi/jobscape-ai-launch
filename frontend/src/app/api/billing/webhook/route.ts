@@ -19,6 +19,19 @@ async function findPlanForSubscription(
   supabase: ReturnType<typeof createServiceSupabaseClient>,
   subscription: Stripe.Subscription,
 ): Promise<SubscriptionPlanRow | null> {
+  const priceId = subscription.items.data[0]?.price.id;
+  if (priceId) {
+    const { data } = await supabase
+      .from("subscription_plans")
+      .select("id, plan_code, stripe_price_id")
+      .eq("stripe_price_id", priceId)
+      .maybeSingle<SubscriptionPlanRow>();
+
+    if (data) {
+      return data;
+    }
+  }
+
   const planCode = subscription.metadata?.plan_code;
   if (planCode) {
     const { data } = await supabase
@@ -31,18 +44,7 @@ async function findPlanForSubscription(
     }
   }
 
-  const priceId = subscription.items.data[0]?.price.id;
-  if (!priceId) {
-    return null;
-  }
-
-  const { data } = await supabase
-    .from("subscription_plans")
-    .select("id, plan_code, stripe_price_id")
-    .eq("stripe_price_id", priceId)
-    .maybeSingle<SubscriptionPlanRow>();
-
-  return data ?? null;
+  return null;
 }
 
 async function resolveUserId(
