@@ -82,6 +82,36 @@ Admin bypass remains server-side in `subscriptionEntitlements.ts`.
 - Feature gate component exists for future gated UI sections.
 - Production build and lint pass.
 
+## User Stories
+
+### See Current Plan And Usage
+
+- Jira: KAN-25
+- Who: As an authenticated JobScrape user.
+- What: I want to see my current plan and usage allowances on the dashboard.
+- Why: So that I understand how much of each feature I can still use.
+
+### Understand Locked Features
+
+- Jira: KAN-25
+- Who: As a Free or Basic user.
+- What: I want locked or unavailable features to show a clear upgrade prompt.
+- Why: So that I know why an action is unavailable and which plan can unlock it.
+
+### Refresh Usage After Actions
+
+- Jira: KAN-25
+- Who: As a user running ATS checks, AI matches, or document generation.
+- What: I want usage counters to refresh after successful actions.
+- Why: So that the dashboard reflects my latest remaining limits.
+
+### Keep Authorization Server-Side
+
+- Jira: KAN-25
+- Who: As the JobScrape system.
+- What: I want frontend entitlement state to be informational only.
+- Why: So that users cannot bypass feature gates by manipulating client-side UI state.
+
 ## Verification
 
 - `npm.cmd run lint`

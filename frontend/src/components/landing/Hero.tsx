@@ -18,7 +18,7 @@ export function HeroSection() {
             Find better jobs with <span className="text-primary">AI-powered</span> resume matching
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-pretty text-base text-muted-foreground md:text-lg lg:mx-0">
-            Upload your resume, search live job listings, and instantly see which roles are worth applying for — before spending time on long applications.
+            Upload your resume, search live job listings, and instantly see which roles are worth applying for - before spending time on long applications.
           </p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:items-start lg:justify-start sm:justify-center">
             <button onClick={() => router.push("/register")} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-soft transition-transform hover:scale-[1.02] sm:w-auto">
@@ -80,7 +80,7 @@ export function ProductMockup() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold">{j.title}</p>
-                  <p className="text-xs text-muted-foreground">{j.company} · Full-time</p>
+                  <p className="text-xs text-muted-foreground">{j.company} - Full-time</p>
                 </div>
                 <div className="text-right">
                   <div className={cn("text-sm font-semibold", j.score >= 85 ? "text-primary" : "text-foreground")}>{j.score}%</div>

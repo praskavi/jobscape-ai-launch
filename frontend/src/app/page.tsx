@@ -1,16 +1,72 @@
 import LandingPage from "../components/LandingPage";
+import { faqs, tiers } from "@/lib/landingData";
+import { absoluteUrl, defaultSeoDescription, siteName } from "@/lib/seo";
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: "Jobscape AI - AI-powered job search & resume matching",
-  description:
-    "Upload your resume, search live jobs, and instantly see which roles are worth applying for with AI-powered match scores.",
+export const metadata: Metadata = {
+  title: "AI Job Matching and ATS Resume Checker",
+  description: defaultSeoDescription,
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
-    title: "Jobscape AI - Apply smarter, not harder",
-    description: "AI resume matching and ATS scoring for live job listings.",
+    title: "Jobscape AI - AI Job Matching and ATS Resume Checker",
+    description: defaultSeoDescription,
+    url: "/",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Jobscape AI - AI Job Matching and ATS Resume Checker",
+    description: defaultSeoDescription,
   },
 };
 
 export default function Home() {
-  return <LandingPage />;
+  const structuredData = [
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      name: siteName,
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: absoluteUrl("/"),
+      description: defaultSeoDescription,
+      offers: tiers.map((tier) => ({
+        "@type": "Offer",
+        name: `${tier.name} plan`,
+        price: tier.price.replace("$", ""),
+        priceCurrency: "USD",
+        url: absoluteUrl("/pricing"),
+      })),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: faqs.map((faq) => ({
+        "@type": "Question",
+        name: faq.q,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: faq.a,
+        },
+      })),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: siteName,
+      url: absoluteUrl("/"),
+    },
+  ];
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+      <LandingPage />
+    </>
+  );
 }

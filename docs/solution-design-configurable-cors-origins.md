@@ -34,6 +34,29 @@ The goal is to make the CORS allowlist configurable via server-side environment 
 - `npm.cmd run lint` passes.
 - `npm.cmd run build` passes.
 
+## User Stories
+
+### Configure API Origins Without Code Changes
+
+- Jira: KAN-25
+- Who: As a deployment owner.
+- What: I want to configure allowed browser origins through `CORS_ALLOWED_ORIGINS`.
+- Why: So that pre-production and production domains can change without requiring a source-code edit.
+
+### Keep Local Development Working
+
+- Jira: KAN-25
+- Who: As a developer working locally.
+- What: I want localhost and `127.0.0.1` to remain allowed during development.
+- Why: So that local app/API testing continues to work without extra environment setup.
+
+### Prevent Broad Browser API Access
+
+- Jira: KAN-25
+- Who: As the JobScrape system.
+- What: I want API CORS to reject untrusted origins.
+- Why: So that browser-based calls are limited to known app domains and accidental broad exposure is avoided.
+
 ## Verification
 
 - Unit-level behavior is simple and covered by code review.

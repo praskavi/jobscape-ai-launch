@@ -239,6 +239,52 @@ New `ResumeLibrary` component (Premium plan only), shown in place of the single 
 
 ---
 
+## User Stories
+
+### Replace Resume On Free Or Basic
+
+- Jira: KAN-25
+- Who: As a Free or Basic JobScrape user.
+- What: I want uploading a new resume to replace my existing stored resume automatically.
+- Why: So that I can keep one current resume without manually cleaning up old files.
+
+### Store Multiple Resumes On Premium
+
+- Jira: KAN-25
+- Who: As a Premium JobScrape user.
+- What: I want to store up to three resume versions.
+- Why: So that I can keep tailored resumes for different job types.
+
+### Choose Active Resume
+
+- Jira: KAN-25
+- Who: As a Premium user with multiple resumes.
+- What: I want to mark one resume as active.
+- Why: So that ATS checks, job matching, and recommendations use the resume I intend.
+
+### Prevent Resume Library Overflow
+
+- Jira: KAN-25
+- Who: As a Premium user at the resume storage limit.
+- What: I want the app to block a fourth resume upload and tell me to delete one first.
+- Why: So that storage limits remain predictable and aligned with plan entitlements.
+
+### Enforce One Active Resume
+
+- Jira: KAN-25
+- Who: As the JobScrape system.
+- What: I want the database to enforce only one active resume per user.
+- Why: So that downstream ATS, matching, and recommendation workflows always have one clear resume source.
+
+### Avoid Monthly Usage Drift
+
+- Jira: KAN-25
+- Who: As the JobScrape system.
+- What: I want resume upload limits checked against stored resume count rather than monthly usage counters.
+- Why: So that resume storage rules match actual files and do not reset incorrectly each month.
+
+---
+
 ## Verification
 
 - `npm run lint` — no errors

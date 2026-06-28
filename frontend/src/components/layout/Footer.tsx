@@ -6,9 +6,30 @@ import Link from "next/link";
 export function Footer() {
   const router = useRouter();
   const cols = [
-    { title: "Product", links: ["Features", "Pricing", "Dashboard"] },
-    { title: "Resources", links: ["Blog", "Help", "Contact"] },
-    { title: "Company", links: ["About", "Privacy", "Terms"] },
+    {
+      title: "Product",
+      links: [
+        { label: "Features", href: "/#features" },
+        { label: "Pricing", href: "/pricing" },
+        { label: "Dashboard", href: "/dashboard" },
+      ],
+    },
+    {
+      title: "Resources",
+      links: [
+        { label: "FAQ", href: "/#faq" },
+        { label: "ATS Checker", href: "/atschecker" },
+        { label: "AI Job Match", href: "/aijobmatch" },
+      ],
+    },
+    {
+      title: "Company",
+      links: [
+        { label: "About", href: "/about" },
+        { label: "Privacy", href: "/privacy" },
+        { label: "Terms", href: "/terms" },
+      ],
+    },
   ];
   return (
     <footer className="border-t border-border bg-surface/60">
@@ -29,18 +50,9 @@ export function Footer() {
             <p className="text-xs font-semibold uppercase tracking-widest text-foreground">{c.title}</p>
             <ul className="mt-4 space-y-2.5">
               {c.links.map((l) => (
-                <li key={l}>
-                  <Link 
-                  href={l === "About"
-            ? "/about"
-            : l === "Privacy"
-            ? "/privacy"
-            : l === "Terms"
-            ? "/terms"
-            : "#"
-        }
-                  className="text-sm text-muted-foreground hover:text-foreground">
-                    {l}
+                <li key={l.label}>
+                  <Link href={l.href} className="text-sm text-muted-foreground hover:text-foreground">
+                    {l.label}
                   </Link>
                 </li>
               ))}
@@ -56,7 +68,7 @@ export function Footer() {
       </div>
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-2 px-5 py-6 text-xs text-muted-foreground sm:flex-row lg:px-8">
-          <p>© 2026 Jobscape AI. All rights reserved.</p>
+          <p>Copyright 2026 Jobscape AI. All rights reserved.</p>
           <p>Made for smarter job seekers.</p>
         </div>
       </div>

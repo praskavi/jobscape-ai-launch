@@ -27,7 +27,7 @@ export function DashboardPreview() {
           <span className="text-xs font-medium uppercase tracking-[0.2em] text-primary">Dashboard</span>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl">See your best-fit jobs first</h2>
           <p className="mt-4 text-muted-foreground">
-            Jobscape AI ranks your search results using your resume profile, skills, job title relevance, and missing requirements — so the strongest matches surface first.
+            Jobscape AI ranks your search results using your resume profile, skills, job title relevance, and missing requirements, so the strongest matches surface first.
           </p>
           <ul className="mt-6 space-y-3 text-sm">
             {["Rule-based and AI scores side by side", "Status badges to triage applications fast", "Filter by recent, remote and top matches"].map((x) => (

@@ -18,7 +18,7 @@ export function TestimonialsSection() {
             <div className="flex gap-0.5 text-primary">
               {Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
             </div>
-            <blockquote className="mt-4 flex-1 text-[15px] leading-relaxed">“{t.q}”</blockquote>
+            <blockquote className="mt-4 flex-1 text-[15px] leading-relaxed">"{t.q}"</blockquote>
             <figcaption className="mt-6 flex items-center gap-3 border-t border-border pt-5">
               <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-primary/70 to-lime/70 text-sm font-semibold text-background">
                 {t.n[0]}

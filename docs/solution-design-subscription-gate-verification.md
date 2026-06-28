@@ -87,6 +87,43 @@ Only provide tokens for scenarios you want to run. With no tokens, the script ve
 - Verification results are documented before production launch.
 - `npm run verify:subscription-gates` exists for repeatable API smoke checks.
 
+## User Stories
+
+### Verify Free User Limits
+
+- Jira: KAN-25
+- Who: As a QA tester.
+- What: I want to verify that Free users are blocked from paid-only features and limited where configured.
+- Why: So that the public free tier behaves as designed before launch.
+
+### Verify Basic User Limits
+
+- Jira: KAN-25
+- Who: As a QA tester.
+- What: I want to test Basic users both below and at their usage limits.
+- Why: So that allowed requests succeed and over-limit requests return stable upgrade/limit responses.
+
+### Verify Premium User Access
+
+- Jira: KAN-25
+- Who: As a QA tester.
+- What: I want to confirm Premium users can access premium limits and features.
+- Why: So that paid users receive the value they subscribed for.
+
+### Verify Admin Bypass
+
+- Jira: KAN-25
+- Who: As a platform operator.
+- What: I want to verify admin users can bypass normal feature gates intentionally.
+- Why: So that support, testing, or operational workflows work without weakening normal user enforcement.
+
+### Run Repeatable Gate Smoke Tests
+
+- Jira: KAN-25
+- Who: As a release owner.
+- What: I want a repeatable script for subscription gate verification.
+- Why: So that pre-production checks can be rerun consistently before deployment.
+
 ## Risks / Follow-ups
 
 - Automated tests need deterministic test users and a resettable usage state.

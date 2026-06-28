@@ -52,6 +52,36 @@ Each policy only exposes chunks where an associated row exists in `public.jobs`.
 - Existing app reads from `my_files` continue to work for authenticated users.
 - `job_chunks` writes remain unavailable to anon/authenticated clients.
 
+## User Stories
+
+### Read Only My Files
+
+- Jira: KAN-25
+- Who: As an authenticated JobScrape user.
+- What: I want file views to return only my own files.
+- Why: So that private resume and document metadata is not exposed to other users.
+
+### Clear Supabase Security Findings
+
+- Jira: KAN-25
+- Who: As a release owner.
+- What: I want Supabase security linter errors fixed before production.
+- Why: So that production launch is not blocked by known database security findings.
+
+### Preserve Public Job Chunk Reads
+
+- Jira: KAN-25
+- Who: As a user browsing/searching jobs.
+- What: I want job chunk reads to keep working for readable public jobs.
+- Why: So that search and matching features continue to function after RLS is enabled.
+
+### Block Client Writes To Job Chunks
+
+- Jira: KAN-25
+- Who: As the JobScrape system.
+- What: I want anon and authenticated clients prevented from writing `job_chunks`.
+- Why: So that ingestion and embedding data can only be changed by trusted server-side workflows.
+
 ## Verification
 
 After applying the migration, run Supabase database linter again and verify both findings are cleared.

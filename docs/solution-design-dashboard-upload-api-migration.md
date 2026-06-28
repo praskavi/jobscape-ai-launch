@@ -54,6 +54,36 @@ Direct client uploads for cover letters remain a follow-up risk if cover letters
 - Cover letter upload behavior remains unchanged.
 - Existing lint and production build pass.
 
+## User Stories
+
+### Upload Resume Through The Gated API
+
+- Jira: KAN-25
+- Who: As a logged-in JobScrape user.
+- What: I want dashboard resume uploads to use the same upload API as the rest of the app.
+- Why: So that validation, storage writes, and subscription checks are applied consistently.
+
+### See Useful Upload Errors
+
+- Jira: KAN-25
+- Who: As a user uploading a resume from the dashboard.
+- What: I want clear error messages when an upload fails because of auth, validation, or plan limits.
+- Why: So that I know whether to sign in again, choose a valid file, delete a resume, or upgrade.
+
+### Preserve Cover Letter Upload Behavior
+
+- Jira: KAN-25
+- Who: As a user managing documents.
+- What: I want existing cover letter uploads to keep working while resume uploads move to the gated API.
+- Why: So that this migration does not break unrelated document storage workflows.
+
+### Enforce Server-Side Upload Rules
+
+- Jira: KAN-25
+- Who: As the JobScrape system.
+- What: I want resume upload entitlement and validation enforced server-side.
+- Why: So that clients cannot bypass plan limits or file validation by writing directly to Supabase.
+
 ## Verification
 
 - `npm.cmd run lint`

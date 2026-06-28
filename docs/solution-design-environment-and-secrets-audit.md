@@ -49,6 +49,36 @@ Other findings:
 - `npm.cmd run lint` passes.
 - `npm.cmd run build` passes.
 
+## User Stories
+
+### Know Required Deployment Variables
+
+- Jira: KAN-25
+- Who: As a deployment owner.
+- What: I want a clear list of required environment variables and where they are used.
+- Why: So that local, pre-production, and production deployments can be configured without guesswork.
+
+### Keep Secrets Server-Side
+
+- Jira: KAN-25
+- Who: As the JobScrape system.
+- What: I want provider keys and service role keys to remain server-only.
+- Why: So that secrets are not exposed to browser bundles or client-side users.
+
+### Rotate Exposed Keys
+
+- Jira: KAN-25
+- Who: As a project maintainer.
+- What: I want any exposed API keys identified and rotated before production.
+- Why: So that leaked credentials cannot be abused after launch.
+
+### Preserve Safe Public Configuration
+
+- Jira: KAN-25
+- Who: As a frontend developer.
+- What: I want only browser-safe Supabase public values exposed through `NEXT_PUBLIC_*`.
+- Why: So that the browser has what it needs without receiving private credentials.
+
 ## Verification
 
 - Review source env usage with `rg "process\\.env\\." frontend/src`.

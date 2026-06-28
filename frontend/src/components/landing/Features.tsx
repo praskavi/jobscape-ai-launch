@@ -21,7 +21,7 @@ export function FeaturesSection() {
           Everything you need to apply smarter
         </h2>
         <p className="mt-4 text-muted-foreground">
-          From resume parsing to AI-powered ATS scoring — Jobscape AI brings every step of the search into one focused workflow.
+          From resume parsing to AI-powered ATS scoring, Jobscape AI brings every step of the search into one focused workflow.
         </p>
       </div>
       <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

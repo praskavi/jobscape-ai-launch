@@ -17,7 +17,7 @@ export const features = [
 ];
 
 export const steps = [
-  { n: "01", title: "Upload Resume", desc: "Drop in your PDF or Word resume — we extract skills automatically.", icon: Upload },
+  { n: "01", title: "Upload Resume", desc: "Drop in your PDF or Word resume - we extract skills automatically.", icon: Upload },
   { n: "02", title: "Search Jobs", desc: "Pull live listings by keyword, location and source.", icon: Search },
   { n: "03", title: "Compare Match Scores", desc: "See rule-based and AI scores side by side.", icon: Gauge },
   { n: "04", title: "Apply With Confidence", desc: "Spend time only on roles where you actually fit.", icon: Check },
@@ -46,7 +46,7 @@ export const testimonials = [
 
 export const faqs = [
   { q: "What is Jobscape AI?", a: "Jobscape AI is an AI-powered job search and resume matching platform that helps you find roles where you actually have a strong fit." },
-  { q: "Do I need to upload a resume?", a: "Yes — uploading at least one resume lets us extract your skills and produce accurate match scores against live job listings." },
+  { q: "Do I need to upload a resume?", a: "Yes - uploading at least one resume lets us extract your skills and produce accurate match scores against live job listings." },
   { q: "How does the match score work?", a: "We combine rule-based comparison (skills, title relevance, missing requirements) with optional AI ATS scoring for deeper analysis." },
   { q: "Does it apply to jobs automatically?", a: "No. Jobscape AI helps you decide which jobs to apply for. You stay in control of every application." },
   { q: "Can I connect this to Supabase later?", a: "Yes. The frontend is structured so authentication and data can be wired into Supabase (or Lovable Cloud) without rewrites." },

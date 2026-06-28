@@ -48,6 +48,36 @@ The root layout mounts the shared Sonner toaster so profile form feedback is vis
 - Save feedback is visible on success and failure.
 - Unauthenticated users are redirected to `/login`.
 
+## User Stories
+
+### View Profile Settings
+
+- Jira: KAN-11
+- Who: As an authenticated JobScrape user.
+- What: I want to view my profile details on the Settings page.
+- Why: So that I can confirm the account information JobScrape stores for me.
+
+### Update Editable Profile Fields
+
+- Jira: KAN-11
+- Who: As an authenticated JobScrape user.
+- What: I want to update my full name, phone, location, and LinkedIn URL.
+- Why: So that my profile stays accurate for app personalization and future job-search workflows.
+
+### Keep Email Read-Only
+
+- Jira: KAN-11
+- Who: As a signed-in user.
+- What: I want my email displayed but not edited from the profile form.
+- Why: So that identity remains controlled by Supabase Auth rather than a profile table update.
+
+### Block Unauthenticated Access
+
+- Jira: KAN-11
+- Who: As the JobScrape system.
+- What: I want unauthenticated users redirected from `/settings` to `/login`.
+- Why: So that private profile information is only available to the account owner.
+
 ## Risks / Notes
 
 - `full_name` is `NOT NULL`; the form requires it before saving.

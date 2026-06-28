@@ -41,6 +41,36 @@ The ATS API resolves the resume in this order:
 - Manual upload still works when no stored resume is available.
 - The API rejects unknown or unowned `resumeFileId` values.
 
+## User Stories
+
+### Use Stored Resume For ATS Check
+
+- Jira: KAN-39
+- Who: As an authenticated JobScrape user with stored resumes.
+- What: I want the ATS Checker to use my saved active resume by default.
+- Why: So that I can run an ATS check without uploading the same resume again.
+
+### Choose A Different Stored Resume
+
+- Jira: KAN-39
+- Who: As a user with more than one stored resume.
+- What: I want to select which stored resume is used for an ATS check.
+- Why: So that I can compare a job against the resume version most relevant to that job.
+
+### Fall Back To Manual Upload
+
+- Jira: KAN-39
+- Who: As a user without a stored resume or with a new resume file.
+- What: I want to manually upload a resume on the ATS Checker page.
+- Why: So that ATS scoring still works when no saved resume is available or when I want to test a new file.
+
+### Protect Stored Resume Access
+
+- Jira: KAN-39
+- Who: As the JobScrape system.
+- What: I want to verify that a submitted `resumeFileId` belongs to the authenticated user.
+- Why: So that users cannot analyze, download, or reference another user's stored resume.
+
 ## Notes
 
 - The API uses the service role key when available, matching other storage-backed API routes.
