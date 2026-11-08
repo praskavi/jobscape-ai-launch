@@ -36,6 +36,9 @@
 
 # Environment files
 .env
+.env.*
+!.env.example
+!.env.*.example
 .env.test.local
 *.local
 
@@ -50,6 +53,7 @@ lerna-debug.log*
 
 # Dependencies and build output
 node_modules
+*.tsbuildinfo
 dist
 dist-ssr
 .output
@@ -64,6 +68,7 @@ dist-ssr
 .dev.vars
 
 # Editor directories and files
+.claude/
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -84,3 +89,6 @@ frontend/playwright.config.ts
 frontend/supabase-registration.integration.test.ts
 frontend/test-results/
 frontend/playwright-report/
+
+# Local workflow export containing embedded credentials
+/n8n-code/ScrapeJob { from seek & indeed} (2).json
